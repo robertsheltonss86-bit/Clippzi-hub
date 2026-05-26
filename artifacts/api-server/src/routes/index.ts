@@ -6,6 +6,7 @@ import livestreamsRouter from "./livestreams";
 import giftsRouter from "./gifts";
 import shopRouter from "./shop";
 import moderationRouter from "./moderation";
+import storageRouter from "./storage";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(livestreamsRouter);
 router.use(giftsRouter);
 router.use(shopRouter);
 router.use(moderationRouter);
+router.use(storageRouter);
 
 export default router;
