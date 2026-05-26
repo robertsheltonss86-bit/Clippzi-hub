@@ -140,6 +140,43 @@ export interface BankAccount {
   createdAt?: string;
 }
 
+export interface Payout {
+  id: number;
+  userId: number;
+  amount: number;
+  status: string;
+  bankLast4: string;
+  createdAt: string;
+}
+
+export interface PlatformPayout {
+  id: number;
+  amount: number;
+  status: string;
+  bankLast4: string;
+  createdAt: string;
+}
+
+export interface PlatformBank {
+  id: number;
+  bankName: string;
+  last4: string;
+  /** @nullable */
+  routingNumber?: string | null;
+  accountHolderName: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface PlatformEarnings {
+  totalGross: number;
+  platformShare: number;
+  streamerShare: number;
+  pendingPayout: number;
+  paidOut: number;
+  payoutCount: number;
+}
+
 export interface BankAccountInput {
   bankName: string;
   accountNumber: string;

@@ -352,6 +352,83 @@ export const LinkBankAccountBody = zod.object({
 
 
 /**
+ * @summary Withdraw pending earnings to linked bank account
+ */
+export const RequestUserPayoutParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary List payout history for a user
+ */
+export const ListUserPayoutsParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListUserPayoutsResponseItem = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "amount": zod.number(),
+  "status": zod.string(),
+  "bankLast4": zod.string(),
+  "createdAt": zod.string()
+})
+export const ListUserPayoutsResponse = zod.array(ListUserPayoutsResponseItem)
+
+
+/**
+ * @summary Total platform (40%) earnings, pending, and paid-out
+ */
+export const GetPlatformEarningsResponse = zod.object({
+  "totalGross": zod.number(),
+  "platformShare": zod.number(),
+  "streamerShare": zod.number(),
+  "pendingPayout": zod.number(),
+  "paidOut": zod.number(),
+  "payoutCount": zod.number()
+})
+
+
+/**
+ * @summary Get the platform's linked bank account
+ */
+export const GetPlatformBankResponse = zod.object({
+  "id": zod.number(),
+  "bankName": zod.string(),
+  "last4": zod.string(),
+  "routingNumber": zod.string().nullish(),
+  "accountHolderName": zod.string(),
+  "status": zod.string(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Link or replace the platform bank account
+ */
+export const LinkPlatformBankBody = zod.object({
+  "bankName": zod.string(),
+  "accountNumber": zod.string(),
+  "routingNumber": zod.string(),
+  "accountHolderName": zod.string()
+})
+
+
+/**
+ * @summary List platform payout history
+ */
+export const ListPlatformPayoutsResponseItem = zod.object({
+  "id": zod.number(),
+  "amount": zod.number(),
+  "status": zod.string(),
+  "bankLast4": zod.string(),
+  "createdAt": zod.string()
+})
+export const ListPlatformPayoutsResponse = zod.array(ListPlatformPayoutsResponseItem)
+
+
+/**
  * @summary List posts (with optional filters)
  */
 export const listPostsQueryTypeDefault = `all`;

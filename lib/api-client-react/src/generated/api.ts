@@ -62,6 +62,10 @@ import type {
   ModerationReportUpdate,
   Notification,
   NotificationReadInput,
+  Payout,
+  PlatformBank,
+  PlatformEarnings,
+  PlatformPayout,
   PlatformStats,
   Post,
   PostInput,
@@ -1152,6 +1156,525 @@ export const useLinkBankAccount = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getLinkBankAccountMutationOptions(options));
     }
+
+export const getRequestUserPayoutUrl = (id: number,) => {
+
+
+
+
+  return `/api/users/${id}/payout`
+}
+
+/**
+ * @summary Withdraw pending earnings to linked bank account
+ */
+export const requestUserPayout = async (id: number, options?: RequestInit): Promise<Payout> => {
+
+  return customFetch<Payout>(getRequestUserPayoutUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRequestUserPayoutMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestUserPayout>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestUserPayout>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['requestUserPayout'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestUserPayout>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  requestUserPayout(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestUserPayoutMutationResult = NonNullable<Awaited<ReturnType<typeof requestUserPayout>>>
+
+    export type RequestUserPayoutMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Withdraw pending earnings to linked bank account
+ */
+export const useRequestUserPayout = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestUserPayout>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestUserPayout>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getRequestUserPayoutMutationOptions(options));
+    }
+
+export const getListUserPayoutsUrl = (id: number,) => {
+
+
+
+
+  return `/api/users/${id}/payout`
+}
+
+/**
+ * @summary List payout history for a user
+ */
+export const listUserPayouts = async (id: number, options?: RequestInit): Promise<Payout[]> => {
+
+  return customFetch<Payout[]>(getListUserPayoutsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListUserPayoutsQueryKey = (id: number,) => {
+    return [
+    `/api/users/${id}/payout`
+    ] as const;
+    }
+
+
+export const getListUserPayoutsQueryOptions = <TData = Awaited<ReturnType<typeof listUserPayouts>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listUserPayouts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListUserPayoutsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listUserPayouts>>> = ({ signal }) => listUserPayouts(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listUserPayouts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListUserPayoutsQueryResult = NonNullable<Awaited<ReturnType<typeof listUserPayouts>>>
+export type ListUserPayoutsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List payout history for a user
+ */
+
+export function useListUserPayouts<TData = Awaited<ReturnType<typeof listUserPayouts>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listUserPayouts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListUserPayoutsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPlatformEarningsUrl = () => {
+
+
+
+
+  return `/api/platform/earnings`
+}
+
+/**
+ * @summary Total platform (40%) earnings, pending, and paid-out
+ */
+export const getPlatformEarnings = async ( options?: RequestInit): Promise<PlatformEarnings> => {
+
+  return customFetch<PlatformEarnings>(getGetPlatformEarningsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPlatformEarningsQueryKey = () => {
+    return [
+    `/api/platform/earnings`
+    ] as const;
+    }
+
+
+export const getGetPlatformEarningsQueryOptions = <TData = Awaited<ReturnType<typeof getPlatformEarnings>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPlatformEarnings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPlatformEarningsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPlatformEarnings>>> = ({ signal }) => getPlatformEarnings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPlatformEarnings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPlatformEarningsQueryResult = NonNullable<Awaited<ReturnType<typeof getPlatformEarnings>>>
+export type GetPlatformEarningsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Total platform (40%) earnings, pending, and paid-out
+ */
+
+export function useGetPlatformEarnings<TData = Awaited<ReturnType<typeof getPlatformEarnings>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPlatformEarnings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPlatformEarningsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPlatformBankUrl = () => {
+
+
+
+
+  return `/api/platform/bank`
+}
+
+/**
+ * @summary Get the platform's linked bank account
+ */
+export const getPlatformBank = async ( options?: RequestInit): Promise<PlatformBank> => {
+
+  return customFetch<PlatformBank>(getGetPlatformBankUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPlatformBankQueryKey = () => {
+    return [
+    `/api/platform/bank`
+    ] as const;
+    }
+
+
+export const getGetPlatformBankQueryOptions = <TData = Awaited<ReturnType<typeof getPlatformBank>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPlatformBank>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPlatformBankQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPlatformBank>>> = ({ signal }) => getPlatformBank({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPlatformBank>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPlatformBankQueryResult = NonNullable<Awaited<ReturnType<typeof getPlatformBank>>>
+export type GetPlatformBankQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the platform's linked bank account
+ */
+
+export function useGetPlatformBank<TData = Awaited<ReturnType<typeof getPlatformBank>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPlatformBank>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPlatformBankQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getLinkPlatformBankUrl = () => {
+
+
+
+
+  return `/api/platform/bank`
+}
+
+/**
+ * @summary Link or replace the platform bank account
+ */
+export const linkPlatformBank = async (bankAccountInput: BankAccountInput, options?: RequestInit): Promise<PlatformBank> => {
+
+  return customFetch<PlatformBank>(getLinkPlatformBankUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      bankAccountInput,)
+  }
+);}
+
+
+
+
+export const getLinkPlatformBankMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof linkPlatformBank>>, TError,{data: BodyType<BankAccountInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof linkPlatformBank>>, TError,{data: BodyType<BankAccountInput>}, TContext> => {
+
+const mutationKey = ['linkPlatformBank'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof linkPlatformBank>>, {data: BodyType<BankAccountInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  linkPlatformBank(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LinkPlatformBankMutationResult = NonNullable<Awaited<ReturnType<typeof linkPlatformBank>>>
+    export type LinkPlatformBankMutationBody = BodyType<BankAccountInput>
+    export type LinkPlatformBankMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Link or replace the platform bank account
+ */
+export const useLinkPlatformBank = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof linkPlatformBank>>, TError,{data: BodyType<BankAccountInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof linkPlatformBank>>,
+        TError,
+        {data: BodyType<BankAccountInput>},
+        TContext
+      > => {
+      return useMutation(getLinkPlatformBankMutationOptions(options));
+    }
+
+export const getRequestPlatformPayoutUrl = () => {
+
+
+
+
+  return `/api/platform/payout`
+}
+
+/**
+ * @summary Withdraw the platform's pending earnings to its linked bank
+ */
+export const requestPlatformPayout = async ( options?: RequestInit): Promise<PlatformPayout> => {
+
+  return customFetch<PlatformPayout>(getRequestPlatformPayoutUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getRequestPlatformPayoutMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestPlatformPayout>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestPlatformPayout>>, TError,void, TContext> => {
+
+const mutationKey = ['requestPlatformPayout'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestPlatformPayout>>, void> = () => {
+
+
+          return  requestPlatformPayout(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestPlatformPayoutMutationResult = NonNullable<Awaited<ReturnType<typeof requestPlatformPayout>>>
+
+    export type RequestPlatformPayoutMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Withdraw the platform's pending earnings to its linked bank
+ */
+export const useRequestPlatformPayout = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestPlatformPayout>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestPlatformPayout>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getRequestPlatformPayoutMutationOptions(options));
+    }
+
+export const getListPlatformPayoutsUrl = () => {
+
+
+
+
+  return `/api/platform/payout`
+}
+
+/**
+ * @summary List platform payout history
+ */
+export const listPlatformPayouts = async ( options?: RequestInit): Promise<PlatformPayout[]> => {
+
+  return customFetch<PlatformPayout[]>(getListPlatformPayoutsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPlatformPayoutsQueryKey = () => {
+    return [
+    `/api/platform/payout`
+    ] as const;
+    }
+
+
+export const getListPlatformPayoutsQueryOptions = <TData = Awaited<ReturnType<typeof listPlatformPayouts>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPlatformPayouts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPlatformPayoutsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPlatformPayouts>>> = ({ signal }) => listPlatformPayouts({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPlatformPayouts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPlatformPayoutsQueryResult = NonNullable<Awaited<ReturnType<typeof listPlatformPayouts>>>
+export type ListPlatformPayoutsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List platform payout history
+ */
+
+export function useListPlatformPayouts<TData = Awaited<ReturnType<typeof listPlatformPayouts>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPlatformPayouts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPlatformPayoutsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getListPostsUrl = (params?: ListPostsParams,) => {
   const normalizedParams = new URLSearchParams();

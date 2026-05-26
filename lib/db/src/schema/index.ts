@@ -4,3 +4,4 @@ export * from "./livestreams";
 export * from "./gifts";
 export * from "./shop";
 export * from "./moderation";
+export * from "./payouts";

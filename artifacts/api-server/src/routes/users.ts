@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { usersTable, followsTable, bankAccountsTable, giftTransactionsTable } from "@workspace/db";
-import { eq, ilike, sql, and } from "drizzle-orm";
+import { usersTable, followsTable, bankAccountsTable, giftTransactionsTable, payoutsTable } from "@workspace/db";
+import { eq, ilike, sql, and, desc } from "drizzle-orm";
 import {
   ListUsersQueryParams,
   CreateUserBody,
@@ -187,17 +187,33 @@ router.get("/users/:id/earnings", async (req, res) => {
       .where(eq(giftTransactionsTable.receiverId, id))
       .limit(50);
 
-    const totalGross = txs.reduce((s, t) => s + Number(t.tx.amount), 0);
-    const streamerShare = txs.reduce((s, t) => s + Number(t.tx.streamerShare), 0);
-    const platformShare = txs.reduce((s, t) => s + Number(t.tx.platformShare), 0);
+    const [shareAgg] = await db
+      .select({
+        totalGross: sql<number>`COALESCE(SUM(${giftTransactionsTable.amount}), 0)`,
+        streamerShare: sql<number>`COALESCE(SUM(${giftTransactionsTable.streamerShare}), 0)`,
+        platformShare: sql<number>`COALESCE(SUM(${giftTransactionsTable.platformShare}), 0)`,
+      })
+      .from(giftTransactionsTable)
+      .where(eq(giftTransactionsTable.receiverId, id));
+
+    const totalGross = Number(shareAgg?.totalGross ?? 0);
+    const streamerShare = Number(shareAgg?.streamerShare ?? 0);
+    const platformShare = Number(shareAgg?.platformShare ?? 0);
+
+    const [paidAgg] = await db
+      .select({ paid: sql<number>`COALESCE(SUM(${payoutsTable.amount}), 0)` })
+      .from(payoutsTable)
+      .where(and(eq(payoutsTable.userId, id), eq(payoutsTable.status, "paid")));
+    const paidOut = Number(paidAgg?.paid ?? 0);
+    const pendingPayout = Math.max(0, streamerShare - paidOut);
 
     res.json({
       userId: id,
       totalGrossEarnings: totalGross,
       streamerShare,
       platformShare,
-      pendingPayout: streamerShare * 0.3,
-      paidOut: streamerShare * 0.7,
+      pendingPayout,
+      paidOut,
       transactions: txs.map((t) => ({
         ...t.tx,
         amount: Number(t.tx.amount),
@@ -215,7 +231,12 @@ router.get("/users/:id/earnings", async (req, res) => {
 router.get("/users/:id/bank", async (req, res) => {
   try {
     const { id } = GetUserBankAccountParams.parse({ id: Number(req.params.id) });
-    const [bank] = await db.select().from(bankAccountsTable).where(eq(bankAccountsTable.userId, id));
+    const [bank] = await db
+      .select()
+      .from(bankAccountsTable)
+      .where(eq(bankAccountsTable.userId, id))
+      .orderBy(desc(bankAccountsTable.id))
+      .limit(1);
     if (!bank) return res.status(404).json({ error: "No bank account linked" });
     res.json({ ...bank, createdAt: bank.createdAt.toISOString() });
   } catch (e) {
@@ -223,21 +244,86 @@ router.get("/users/:id/bank", async (req, res) => {
   }
 });
 
-// POST /users/:id/bank
+// POST /users/:id/bank — replaces any existing linked bank for this user
 router.post("/users/:id/bank", async (req, res) => {
   try {
     const { id } = LinkBankAccountParams.parse({ id: Number(req.params.id) });
     const body = LinkBankAccountBody.parse(req.body);
     const last4 = body.accountNumber.slice(-4);
-    const [bank] = await db.insert(bankAccountsTable).values({
-      userId: id,
-      bankName: body.bankName,
-      last4,
-      routingNumber: body.routingNumber,
-      accountHolderName: body.accountHolderName,
-      status: "pending",
-    }).returning();
+    const bank = await db.transaction(async (tx) => {
+      await tx.delete(bankAccountsTable).where(eq(bankAccountsTable.userId, id));
+      const [row] = await tx.insert(bankAccountsTable).values({
+        userId: id,
+        bankName: body.bankName,
+        last4,
+        routingNumber: body.routingNumber,
+        accountHolderName: body.accountHolderName,
+        status: "verified",
+      }).returning();
+      return row;
+    });
     res.status(201).json({ ...bank, createdAt: bank.createdAt.toISOString() });
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+// POST /users/:id/payout — withdraw pending earnings
+router.post("/users/:id/payout", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "Invalid user id" });
+
+    const result = await db.transaction(async (tx) => {
+      // Per-user advisory lock prevents concurrent withdraw races (double-pay).
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${id})`);
+
+      const [bank] = await tx
+        .select()
+        .from(bankAccountsTable)
+        .where(eq(bankAccountsTable.userId, id))
+        .orderBy(desc(bankAccountsTable.id))
+        .limit(1);
+      if (!bank) throw new Error("NO_BANK");
+
+      const [shareAgg] = await tx
+        .select({ s: sql<number>`COALESCE(SUM(${giftTransactionsTable.streamerShare}), 0)` })
+        .from(giftTransactionsTable)
+        .where(eq(giftTransactionsTable.receiverId, id));
+      const streamerShare = Number(shareAgg?.s ?? 0);
+
+      const [paidAgg] = await tx
+        .select({ p: sql<number>`COALESCE(SUM(${payoutsTable.amount}), 0)` })
+        .from(payoutsTable)
+        .where(and(eq(payoutsTable.userId, id), eq(payoutsTable.status, "paid")));
+      const paidOut = Number(paidAgg?.p ?? 0);
+
+      const pending = Math.max(0, streamerShare - paidOut);
+      if (pending <= 0) throw new Error("NO_BALANCE");
+
+      const [payout] = await tx.insert(payoutsTable).values({
+        userId: id,
+        amount: String(pending.toFixed(2)),
+        status: "paid",
+        bankLast4: bank.last4,
+      }).returning();
+      return payout;
+    });
+
+    res.status(201).json({ ...result, amount: Number(result.amount), createdAt: result.createdAt.toISOString() });
+  } catch (e: any) {
+    if (e?.message === "NO_BANK") return res.status(400).json({ error: "Link a bank account before withdrawing." });
+    if (e?.message === "NO_BALANCE") return res.status(400).json({ error: "No pending earnings to withdraw." });
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+// GET /users/:id/payout — list payout history
+router.get("/users/:id/payout", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const rows = await db.select().from(payoutsTable).where(eq(payoutsTable.userId, id)).orderBy(desc(payoutsTable.createdAt));
+    res.json(rows.map((r) => ({ ...r, amount: Number(r.amount), createdAt: r.createdAt.toISOString() })));
   } catch (e) {
     res.status(400).json({ error: String(e) });
   }

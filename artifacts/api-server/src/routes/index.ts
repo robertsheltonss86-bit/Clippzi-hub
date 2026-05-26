@@ -7,6 +7,7 @@ import giftsRouter from "./gifts";
 import shopRouter from "./shop";
 import moderationRouter from "./moderation";
 import storageRouter from "./storage";
+import platformRouter from "./platform";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(giftsRouter);
 router.use(shopRouter);
 router.use(moderationRouter);
 router.use(storageRouter);
+router.use(platformRouter);
 
 export default router;

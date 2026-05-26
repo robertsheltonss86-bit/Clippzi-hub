@@ -344,6 +344,103 @@ paths:
               schema:
                 $ref: "#/components/schemas/BankAccount"
 
+  /users/{id}/payout:
+    post:
+      operationId: requestUserPayout
+      tags: [users]
+      summary: Withdraw pending earnings to linked bank account
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "201":
+          description: Payout created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Payout" }
+    get:
+      operationId: listUserPayouts
+      tags: [users]
+      summary: List payout history for a user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Payout" }
+
+  /platform/earnings:
+    get:
+      operationId: getPlatformEarnings
+      tags: [platform]
+      summary: Total platform (40%) earnings, pending, and paid-out
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlatformEarnings" }
+
+  /platform/bank:
+    get:
+      operationId: getPlatformBank
+      tags: [platform]
+      summary: Get the platform's linked bank account
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlatformBank" }
+    post:
+      operationId: linkPlatformBank
+      tags: [platform]
+      summary: Link or replace the platform bank account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BankAccountInput" }
+      responses:
+        "201":
+          description: Linked
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlatformBank" }
+
+  /platform/payout:
+    post:
+      operationId: requestPlatformPayout
+      tags: [platform]
+      summary: Withdraw the platform's pending earnings to its linked bank
+      responses:
+        "201":
+          description: Payout created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlatformPayout" }
+    get:
+      operationId: listPlatformPayouts
+      tags: [platform]
+      summary: List platform payout history
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PlatformPayout" }
+
   # ── POSTS ──
   /posts:
     get:
@@ -1342,6 +1439,50 @@ components:
         routingNumber: { type: ["string", "null"] }
         status: { type: string, enum: [pending, verified, failed] }
         createdAt: { type: string }
+
+    Payout:
+      type: object
+      required: [id, userId, amount, status, bankLast4, createdAt]
+      properties:
+        id: { type: integer }
+        userId: { type: integer }
+        amount: { type: number }
+        status: { type: string }
+        bankLast4: { type: string }
+        createdAt: { type: string }
+
+    PlatformPayout:
+      type: object
+      required: [id, amount, status, bankLast4, createdAt]
+      properties:
+        id: { type: integer }
+        amount: { type: number }
+        status: { type: string }
+        bankLast4: { type: string }
+        createdAt: { type: string }
+
+    PlatformBank:
+      type: object
+      required: [id, bankName, last4, accountHolderName, status, createdAt]
+      properties:
+        id: { type: integer }
+        bankName: { type: string }
+        last4: { type: string }
+        routingNumber: { type: ["string", "null"] }
+        accountHolderName: { type: string }
+        status: { type: string }
+        createdAt: { type: string }
+
+    PlatformEarnings:
+      type: object
+      required: [totalGross, platformShare, streamerShare, pendingPayout, paidOut, payoutCount]
+      properties:
+        totalGross: { type: number }
+        platformShare: { type: number }
+        streamerShare: { type: number }
+        pendingPayout: { type: number }
+        paidOut: { type: number }
+        payoutCount: { type: integer }
 
     BankAccountInput:
       type: object
