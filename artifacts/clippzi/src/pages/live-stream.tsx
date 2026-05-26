@@ -168,7 +168,7 @@ export default function LiveStream() {
                 >
                    <span className="text-2xl mb-1 filter drop-shadow-md">{gift.emoji}</span>
                    <span className="text-[10px] text-white font-medium truncate w-full text-center">{gift.name}</span>
-                   <span className="text-[10px] text-primary font-bold">{gift.price}c</span>
+                   <span className="text-[10px] text-primary font-bold">${Number(gift.price).toFixed(2)}</span>
                 </button>
               ))}
             </div>
