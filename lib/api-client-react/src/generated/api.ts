@@ -22,6 +22,8 @@ import type {
 import type {
   BankAccount,
   BankAccountInput,
+  BattleScoreInput,
+  BattleStartInput,
   Comment,
   CommentInput,
   ContentAnalysisInput,
@@ -65,6 +67,7 @@ import type {
   PostInput,
   RequestUploadUrl400,
   RequestUploadUrl500,
+  ShareResult,
   ShopOrder,
   ShopOrderInput,
   ShopOrderUpdate,
@@ -1536,6 +1539,76 @@ export const useDeletePost = <TError = ErrorType<unknown>,
       return useMutation(getDeletePostMutationOptions(options));
     }
 
+export const getSharePostUrl = (id: number,) => {
+
+
+
+
+  return `/api/posts/${id}/share`
+}
+
+/**
+ * @summary Record a share of a post
+ */
+export const sharePost = async (id: number, options?: RequestInit): Promise<ShareResult> => {
+
+  return customFetch<ShareResult>(getSharePostUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getSharePostMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sharePost>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sharePost>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['sharePost'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sharePost>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  sharePost(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SharePostMutationResult = NonNullable<Awaited<ReturnType<typeof sharePost>>>
+
+    export type SharePostMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Record a share of a post
+ */
+export const useSharePost = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sharePost>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sharePost>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getSharePostMutationOptions(options));
+    }
+
 export const getLikePostUrl = (id: number,) => {
 
 
@@ -2155,6 +2228,220 @@ export const useUpdateLivestream = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateLivestreamMutationOptions(options));
+    }
+
+export const getStartBattleUrl = (id: number,) => {
+
+
+
+
+  return `/api/livestreams/${id}/battle`
+}
+
+/**
+ * @summary Start a battle against another live stream
+ */
+export const startBattle = async (id: number,
+    battleStartInput: BattleStartInput, options?: RequestInit): Promise<Livestream> => {
+
+  return customFetch<Livestream>(getStartBattleUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      battleStartInput,)
+  }
+);}
+
+
+
+
+export const getStartBattleMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startBattle>>, TError,{id: number;data: BodyType<BattleStartInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startBattle>>, TError,{id: number;data: BodyType<BattleStartInput>}, TContext> => {
+
+const mutationKey = ['startBattle'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startBattle>>, {id: number;data: BodyType<BattleStartInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  startBattle(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartBattleMutationResult = NonNullable<Awaited<ReturnType<typeof startBattle>>>
+    export type StartBattleMutationBody = BodyType<BattleStartInput>
+    export type StartBattleMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Start a battle against another live stream
+ */
+export const useStartBattle = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startBattle>>, TError,{id: number;data: BodyType<BattleStartInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startBattle>>,
+        TError,
+        {id: number;data: BodyType<BattleStartInput>},
+        TContext
+      > => {
+      return useMutation(getStartBattleMutationOptions(options));
+    }
+
+export const getEndBattleUrl = (id: number,) => {
+
+
+
+
+  return `/api/livestreams/${id}/battle`
+}
+
+/**
+ * @summary End the current battle
+ */
+export const endBattle = async (id: number, options?: RequestInit): Promise<Livestream> => {
+
+  return customFetch<Livestream>(getEndBattleUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getEndBattleMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof endBattle>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof endBattle>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['endBattle'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof endBattle>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  endBattle(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EndBattleMutationResult = NonNullable<Awaited<ReturnType<typeof endBattle>>>
+
+    export type EndBattleMutationError = ErrorType<unknown>
+
+    /**
+ * @summary End the current battle
+ */
+export const useEndBattle = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof endBattle>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof endBattle>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getEndBattleMutationOptions(options));
+    }
+
+export const getAddBattleScoreUrl = (id: number,) => {
+
+
+
+
+  return `/api/livestreams/${id}/battle/score`
+}
+
+/**
+ * @summary Add points to this stream's battle score (gift value)
+ */
+export const addBattleScore = async (id: number,
+    battleScoreInput: BattleScoreInput, options?: RequestInit): Promise<Livestream> => {
+
+  return customFetch<Livestream>(getAddBattleScoreUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      battleScoreInput,)
+  }
+);}
+
+
+
+
+export const getAddBattleScoreMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addBattleScore>>, TError,{id: number;data: BodyType<BattleScoreInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addBattleScore>>, TError,{id: number;data: BodyType<BattleScoreInput>}, TContext> => {
+
+const mutationKey = ['addBattleScore'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addBattleScore>>, {id: number;data: BodyType<BattleScoreInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  addBattleScore(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddBattleScoreMutationResult = NonNullable<Awaited<ReturnType<typeof addBattleScore>>>
+    export type AddBattleScoreMutationBody = BodyType<BattleScoreInput>
+    export type AddBattleScoreMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Add points to this stream's battle score (gift value)
+ */
+export const useAddBattleScore = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addBattleScore>>, TError,{id: number;data: BodyType<BattleScoreInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addBattleScore>>,
+        TError,
+        {id: number;data: BodyType<BattleScoreInput>},
+        TContext
+      > => {
+      return useMutation(getAddBattleScoreMutationOptions(options));
     }
 
 export const getGetLivestreamViewersUrl = (id: number,) => {

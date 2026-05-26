@@ -527,6 +527,19 @@ export const DeletePostParams = zod.object({
 
 
 /**
+ * @summary Record a share of a post
+ */
+export const SharePostParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const SharePostResponse = zod.object({
+  "shareCount": zod.number(),
+  "shareUrl": zod.string()
+})
+
+
+/**
  * @summary Like or unlike a post
  */
 export const LikePostParams = zod.object({
@@ -718,6 +731,10 @@ export const ListLivestreamsResponseItem = zod.object({
   "category": zod.string().nullish(),
   "startedAt": zod.string().nullish(),
   "endedAt": zod.string().nullish(),
+  "battleOpponentId": zod.number().nullish(),
+  "battleScore": zod.number().optional(),
+  "battleOpponentScore": zod.number().optional(),
+  "battleEndsAt": zod.string().nullish(),
   "createdAt": zod.string()
 })
 export const ListLivestreamsResponse = zod.array(ListLivestreamsResponseItem)
@@ -774,6 +791,10 @@ export const GetLivestreamResponse = zod.object({
   "category": zod.string().nullish(),
   "startedAt": zod.string().nullish(),
   "endedAt": zod.string().nullish(),
+  "battleOpponentId": zod.number().nullish(),
+  "battleScore": zod.number().optional(),
+  "battleOpponentScore": zod.number().optional(),
+  "battleEndsAt": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -825,6 +846,160 @@ export const UpdateLivestreamResponse = zod.object({
   "category": zod.string().nullish(),
   "startedAt": zod.string().nullish(),
   "endedAt": zod.string().nullish(),
+  "battleOpponentId": zod.number().nullish(),
+  "battleScore": zod.number().optional(),
+  "battleOpponentScore": zod.number().optional(),
+  "battleEndsAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Start a battle against another live stream
+ */
+export const StartBattleParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const StartBattleBody = zod.object({
+  "opponentStreamId": zod.number(),
+  "durationSeconds": zod.number()
+})
+
+export const StartBattleResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "user": zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string(),
+  "bio": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "bannerUrl": zod.string().nullish(),
+  "isVerified": zod.boolean().optional(),
+  "isLive": zod.boolean().optional(),
+  "followerCount": zod.number().optional(),
+  "followingCount": zod.number().optional(),
+  "postCount": zod.number().optional(),
+  "totalViews": zod.number().optional(),
+  "role": zod.enum(['user', 'streamer', 'admin']).optional(),
+  "createdAt": zod.string()
+}).optional(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "thumbnailUrl": zod.string().nullish(),
+  "streamKey": zod.string().nullish(),
+  "playbackUrl": zod.string().nullish(),
+  "status": zod.enum(['live', 'ended', 'scheduled']),
+  "viewerCount": zod.number(),
+  "peakViewerCount": zod.number().optional(),
+  "totalGiftsReceived": zod.number().optional(),
+  "activeFilter": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "startedAt": zod.string().nullish(),
+  "endedAt": zod.string().nullish(),
+  "battleOpponentId": zod.number().nullish(),
+  "battleScore": zod.number().optional(),
+  "battleOpponentScore": zod.number().optional(),
+  "battleEndsAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary End the current battle
+ */
+export const EndBattleParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const EndBattleResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "user": zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string(),
+  "bio": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "bannerUrl": zod.string().nullish(),
+  "isVerified": zod.boolean().optional(),
+  "isLive": zod.boolean().optional(),
+  "followerCount": zod.number().optional(),
+  "followingCount": zod.number().optional(),
+  "postCount": zod.number().optional(),
+  "totalViews": zod.number().optional(),
+  "role": zod.enum(['user', 'streamer', 'admin']).optional(),
+  "createdAt": zod.string()
+}).optional(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "thumbnailUrl": zod.string().nullish(),
+  "streamKey": zod.string().nullish(),
+  "playbackUrl": zod.string().nullish(),
+  "status": zod.enum(['live', 'ended', 'scheduled']),
+  "viewerCount": zod.number(),
+  "peakViewerCount": zod.number().optional(),
+  "totalGiftsReceived": zod.number().optional(),
+  "activeFilter": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "startedAt": zod.string().nullish(),
+  "endedAt": zod.string().nullish(),
+  "battleOpponentId": zod.number().nullish(),
+  "battleScore": zod.number().optional(),
+  "battleOpponentScore": zod.number().optional(),
+  "battleEndsAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Add points to this stream's battle score (gift value)
+ */
+export const AddBattleScoreParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const AddBattleScoreBody = zod.object({
+  "points": zod.number()
+})
+
+export const AddBattleScoreResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "user": zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string(),
+  "bio": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "bannerUrl": zod.string().nullish(),
+  "isVerified": zod.boolean().optional(),
+  "isLive": zod.boolean().optional(),
+  "followerCount": zod.number().optional(),
+  "followingCount": zod.number().optional(),
+  "postCount": zod.number().optional(),
+  "totalViews": zod.number().optional(),
+  "role": zod.enum(['user', 'streamer', 'admin']).optional(),
+  "createdAt": zod.string()
+}).optional(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "thumbnailUrl": zod.string().nullish(),
+  "streamKey": zod.string().nullish(),
+  "playbackUrl": zod.string().nullish(),
+  "status": zod.enum(['live', 'ended', 'scheduled']),
+  "viewerCount": zod.number(),
+  "peakViewerCount": zod.number().optional(),
+  "totalGiftsReceived": zod.number().optional(),
+  "activeFilter": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "startedAt": zod.string().nullish(),
+  "endedAt": zod.string().nullish(),
+  "battleOpponentId": zod.number().nullish(),
+  "battleScore": zod.number().optional(),
+  "battleOpponentScore": zod.number().optional(),
+  "battleEndsAt": zod.string().nullish(),
   "createdAt": zod.string()
 })
 

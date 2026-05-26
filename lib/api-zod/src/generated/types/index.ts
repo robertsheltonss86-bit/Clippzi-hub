@@ -9,6 +9,8 @@
 export * from './bankAccount';
 export * from './bankAccountInput';
 export * from './bankAccountStatus';
+export * from './battleScoreInput';
+export * from './battleStartInput';
 export * from './comment';
 export * from './commentInput';
 export * from './contentAnalysisInput';
@@ -70,6 +72,7 @@ export * from './postModerationStatus';
 export * from './postType';
 export * from './requestUploadUrl400';
 export * from './requestUploadUrl500';
+export * from './shareResult';
 export * from './shopOrder';
 export * from './shopOrderInput';
 export * from './shopOrderStatus';

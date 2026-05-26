@@ -451,6 +451,25 @@ paths:
         "204":
           description: Deleted
 
+  /posts/{id}/share:
+    post:
+      operationId: sharePost
+      tags: [posts]
+      summary: Record a share of a post
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareResult"
+
   /posts/{id}/like:
     post:
       operationId: likePost
@@ -624,6 +643,73 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/LivestreamUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Livestream"
+
+  /livestreams/{id}/battle:
+    post:
+      operationId: startBattle
+      tags: [livestreams]
+      summary: Start a battle against another live stream
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BattleStartInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Livestream"
+    delete:
+      operationId: endBattle
+      tags: [livestreams]
+      summary: End the current battle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Livestream"
+
+  /livestreams/{id}/battle/score:
+    post:
+      operationId: addBattleScore
+      tags: [livestreams]
+      summary: Add points to this stream's battle score (gift value)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BattleScoreInput"
       responses:
         "200":
           description: OK
@@ -1340,6 +1426,26 @@ components:
         liked: { type: boolean }
         likeCount: { type: integer }
 
+    ShareResult:
+      type: object
+      required: [shareCount, shareUrl]
+      properties:
+        shareCount: { type: integer }
+        shareUrl: { type: string }
+
+    BattleStartInput:
+      type: object
+      required: [opponentStreamId, durationSeconds]
+      properties:
+        opponentStreamId: { type: integer }
+        durationSeconds: { type: integer }
+
+    BattleScoreInput:
+      type: object
+      required: [points]
+      properties:
+        points: { type: number }
+
     # ── LIVE STREAM ──
     Livestream:
       type: object
@@ -1361,6 +1467,10 @@ components:
         category: { type: ["string", "null"] }
         startedAt: { type: ["string", "null"] }
         endedAt: { type: ["string", "null"] }
+        battleOpponentId: { type: ["integer", "null"] }
+        battleScore: { type: number }
+        battleOpponentScore: { type: number }
+        battleEndsAt: { type: ["string", "null"] }
         createdAt: { type: string }
 
     LivestreamInput:

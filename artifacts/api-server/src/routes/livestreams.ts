@@ -18,10 +18,13 @@ async function enrichStream(stream: typeof livestreamsTable.$inferSelect) {
   return {
     ...stream,
     totalGiftsReceived: Number(stream.totalGiftsReceived),
+    battleScore: Number(stream.battleScore),
+    battleOpponentScore: Number(stream.battleOpponentScore),
     user: user ? { ...user, createdAt: user.createdAt.toISOString() } : null,
     createdAt: stream.createdAt.toISOString(),
     startedAt: stream.startedAt?.toISOString() ?? null,
     endedAt: stream.endedAt?.toISOString() ?? null,
+    battleEndsAt: stream.battleEndsAt?.toISOString() ?? null,
   };
 }
 
@@ -99,6 +102,95 @@ router.patch("/livestreams/:id", async (req, res) => {
     const [stream] = await db.update(livestreamsTable).set(updateData).where(eq(livestreamsTable.id, id)).returning();
     if (!stream) return res.status(404).json({ error: "Stream not found" });
     res.json(await enrichStream(stream));
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+// POST /livestreams/:id/battle - start battle
+router.post("/livestreams/:id/battle", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { opponentStreamId, durationSeconds } = req.body as { opponentStreamId: number; durationSeconds: number };
+    if (!Number.isFinite(id) || !Number.isFinite(opponentStreamId)) return res.status(400).json({ error: "Invalid id" });
+    if (id === opponentStreamId) return res.status(400).json({ error: "Cannot battle yourself" });
+    const dur = Math.min(Math.max(Number(durationSeconds) || 180, 30), 600);
+    const endsAt = new Date(Date.now() + dur * 1000);
+
+    const result = await db.transaction(async (tx) => {
+      const [me] = await tx.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
+      const [opp] = await tx.select().from(livestreamsTable).where(eq(livestreamsTable.id, opponentStreamId));
+      if (!me || !opp) return { error: "Stream not found", status: 404 as const };
+      if (me.status !== "live" || opp.status !== "live") return { error: "Both streams must be live", status: 400 as const };
+      if (me.battleOpponentId || opp.battleOpponentId) return { error: "One of the streams is already in a battle", status: 409 as const };
+      const [updatedMe] = await tx.update(livestreamsTable).set({
+        battleOpponentId: opponentStreamId,
+        battleScore: "0",
+        battleOpponentScore: "0",
+        battleEndsAt: endsAt,
+      }).where(eq(livestreamsTable.id, id)).returning();
+      await tx.update(livestreamsTable).set({
+        battleOpponentId: id,
+        battleScore: "0",
+        battleOpponentScore: "0",
+        battleEndsAt: endsAt,
+      }).where(eq(livestreamsTable.id, opponentStreamId));
+      return { stream: updatedMe };
+    });
+    if ("error" in result) return res.status(result.status).json({ error: result.error });
+    res.json(await enrichStream(result.stream));
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+// DELETE /livestreams/:id/battle - end battle
+router.delete("/livestreams/:id/battle", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [current] = await db.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
+    if (!current) return res.status(404).json({ error: "Stream not found" });
+    const opp = current.battleOpponentId;
+    const [stream] = await db.update(livestreamsTable).set({
+      battleOpponentId: null,
+      battleEndsAt: null,
+    }).where(eq(livestreamsTable.id, id)).returning();
+    if (opp) {
+      await db.update(livestreamsTable).set({
+        battleOpponentId: null,
+        battleEndsAt: null,
+      }).where(eq(livestreamsTable.id, opp));
+    }
+    res.json(await enrichStream(stream));
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+// POST /livestreams/:id/battle/score - add to score
+router.post("/livestreams/:id/battle/score", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { points } = req.body as { points: number };
+    const pts = Number(points);
+    if (!Number.isFinite(id) || !Number.isFinite(pts)) return res.status(400).json({ error: "Invalid" });
+    if (pts <= 0 || pts > 1000) return res.status(400).json({ error: "Points must be between 0 and 1000" });
+
+    const result = await db.transaction(async (tx) => {
+      const [current] = await tx.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
+      if (!current) return { error: "Stream not found", status: 404 as const };
+      if (!current.battleOpponentId || !current.battleEndsAt) return { error: "No active battle", status: 409 as const };
+      if (new Date(current.battleEndsAt).getTime() <= Date.now()) return { error: "Battle has expired", status: 409 as const };
+      const [stream] = await tx.update(livestreamsTable).set({
+        battleScore: sql`${livestreamsTable.battleScore} + ${pts}`,
+      }).where(eq(livestreamsTable.id, id)).returning();
+      await tx.update(livestreamsTable).set({
+        battleOpponentScore: sql`${livestreamsTable.battleOpponentScore} + ${pts}`,
+      }).where(eq(livestreamsTable.id, current.battleOpponentId));
+      return { stream };
+    });
+    if ("error" in result) return res.status(result.status).json({ error: result.error });
+    res.json(await enrichStream(result.stream));
   } catch (e) {
     res.status(400).json({ error: String(e) });
   }

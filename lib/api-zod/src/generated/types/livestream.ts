@@ -33,5 +33,11 @@ export interface Livestream {
   startedAt?: string | null;
   /** @nullable */
   endedAt?: string | null;
+  /** @nullable */
+  battleOpponentId?: number | null;
+  battleScore?: number;
+  battleOpponentScore?: number;
+  /** @nullable */
+  battleEndsAt?: string | null;
   createdAt: string;
 }

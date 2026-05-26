@@ -21,6 +21,10 @@ export const livestreamsTable = pgTable("livestreams", {
   category: text("category"),
   startedAt: timestamp("started_at"),
   endedAt: timestamp("ended_at"),
+  battleOpponentId: integer("battle_opponent_id"),
+  battleScore: numeric("battle_score", { precision: 10, scale: 2 }).notNull().default("0"),
+  battleOpponentScore: numeric("battle_opponent_score", { precision: 10, scale: 2 }).notNull().default("0"),
+  battleEndsAt: timestamp("battle_ends_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

@@ -129,6 +129,22 @@ router.post("/posts/:id/like", async (req, res) => {
   }
 });
 
+// POST /posts/:id/share
+router.post("/posts/:id/share", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+    const [post] = await db.update(postsTable)
+      .set({ shareCount: sql`${postsTable.shareCount} + 1` })
+      .where(eq(postsTable.id, id))
+      .returning({ shareCount: postsTable.shareCount });
+    if (!post) return res.status(404).json({ error: "Post not found" });
+    res.json({ shareCount: post.shareCount, shareUrl: `https://clippzi.app/p/${id}` });
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
 // GET /feed
 router.get("/feed", async (req, res) => {
   try {

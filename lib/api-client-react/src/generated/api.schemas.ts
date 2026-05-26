@@ -244,6 +244,20 @@ export interface LikeResult {
   likeCount: number;
 }
 
+export interface ShareResult {
+  shareCount: number;
+  shareUrl: string;
+}
+
+export interface BattleStartInput {
+  opponentStreamId: number;
+  durationSeconds: number;
+}
+
+export interface BattleScoreInput {
+  points: number;
+}
+
 export type LivestreamStatus = typeof LivestreamStatus[keyof typeof LivestreamStatus];
 
 
@@ -278,6 +292,12 @@ export interface Livestream {
   startedAt?: string | null;
   /** @nullable */
   endedAt?: string | null;
+  /** @nullable */
+  battleOpponentId?: number | null;
+  battleScore?: number;
+  battleOpponentScore?: number;
+  /** @nullable */
+  battleEndsAt?: string | null;
   createdAt: string;
 }
 
