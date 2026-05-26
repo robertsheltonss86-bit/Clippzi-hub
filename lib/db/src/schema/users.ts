@@ -19,6 +19,8 @@ export const usersTable = pgTable("users", {
   postCount: integer("post_count").notNull().default(0),
   totalViews: integer("total_views").notNull().default(0),
   role: userRoleEnum("role").notNull().default("user"),
+  stripeAccountId: text("stripe_account_id"),
+  stripePayoutsEnabled: boolean("stripe_payouts_enabled").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

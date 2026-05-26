@@ -8,6 +8,7 @@ import shopRouter from "./shop";
 import moderationRouter from "./moderation";
 import storageRouter from "./storage";
 import platformRouter from "./platform";
+import stripeConnectRouter from "./stripe-connect";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(shopRouter);
 router.use(moderationRouter);
 router.use(storageRouter);
 router.use(platformRouter);
+router.use(stripeConnectRouter);
 
 export default router;

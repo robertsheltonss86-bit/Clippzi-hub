@@ -1,77 +1,29 @@
-import { useState } from "react";
-import {
-  useGetPlatformEarnings,
-  useGetPlatformBank,
-  useLinkPlatformBank,
-  useRequestPlatformPayout,
-  useListPlatformPayouts,
-  getGetPlatformEarningsQueryKey,
-  getGetPlatformBankQueryKey,
-  getListPlatformPayoutsQueryKey,
-} from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useGetPlatformEarnings } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger,
-} from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
-import { Shield, Banknote, ArrowDownToLine, Lock, DollarSign, TrendingUp, Users } from "lucide-react";
+import { Shield, Banknote, DollarSign, TrendingUp, Users, ExternalLink, Info } from "lucide-react";
 
+const apiBase = `${import.meta.env.BASE_URL}api`;
 const fmt = (n: number) =>
   `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function Moderation() {
-  const qc = useQueryClient();
-  const { toast } = useToast();
   const { data: earnings } = useGetPlatformEarnings();
-  const { data: bank } = useGetPlatformBank({ query: { retry: false } });
-  const { data: payouts } = useListPlatformPayouts();
-  const linkBank = useLinkPlatformBank();
-  const requestPayout = useRequestPlatformPayout();
 
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ bankName: "", accountNumber: "", routingNumber: "", accountHolderName: "" });
-
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: getGetPlatformEarningsQueryKey() });
-    qc.invalidateQueries({ queryKey: getGetPlatformBankQueryKey() });
-    qc.invalidateQueries({ queryKey: getListPlatformPayoutsQueryKey() });
-  };
-
-  const submitBank = async () => {
-    if (!form.bankName || !form.accountNumber || !form.accountHolderName) {
-      toast({ title: "Fill required fields", variant: "destructive" });
-      return;
-    }
-    try {
-      await linkBank.mutateAsync({ data: form });
-      toast({ title: "Platform bank linked!", description: `Account •••${form.accountNumber.slice(-4)}` });
-      setOpen(false);
-      setForm({ bankName: "", accountNumber: "", routingNumber: "", accountHolderName: "" });
-      invalidate();
-    } catch (e: any) {
-      toast({ title: "Couldn't link bank", description: String(e?.message ?? e), variant: "destructive" });
-    }
-  };
-
-  const withdraw = async () => {
-    try {
-      const p = await requestPayout.mutateAsync();
-      toast({ title: "Platform withdrawal sent!", description: `${fmt(Number(p.amount))} to •••${p.bankLast4}` });
-      invalidate();
-    } catch (e: any) {
-      const msg = e?.response?.data?.error ?? String(e?.message ?? e);
-      toast({ title: "Withdrawal failed", description: msg, variant: "destructive" });
-    }
-  };
-
-  const pending = earnings?.pendingPayout ?? 0;
-  const hasBank = !!bank && !(bank as any).error;
-  const canWithdraw = hasBank && pending > 0;
+  const balance = useQuery<{ available: number; pending: number; currency: string }>({
+    queryKey: ["stripe-balance"],
+    queryFn: async () => {
+      const r = await fetch(`${apiBase}/platform/stripe/balance`);
+      if (!r.ok) throw new Error("failed");
+      return r.json();
+    },
+  });
+  const dashboard = useQuery<{ url: string }>({
+    queryKey: ["stripe-dashboard"],
+    queryFn: async () => (await fetch(`${apiBase}/platform/stripe/dashboard`)).json(),
+  });
 
   return (
     <div className="min-h-screen bg-background p-6 max-w-5xl mx-auto" data-testid="page-moderation">
@@ -79,31 +31,31 @@ export default function Moderation() {
         <Shield className="w-7 h-7 text-primary" />
         <h1 className="text-3xl font-bold">Platform Admin</h1>
       </div>
-      <p className="text-sm text-muted-foreground mb-6">Manage your 40% platform revenue from gifts</p>
+      <p className="text-sm text-muted-foreground mb-6">Your 40% platform revenue from gifts (powered by Stripe Connect)</p>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-normal text-muted-foreground flex items-center gap-2">
-              <DollarSign className="w-4 h-4" /> Platform Pending
+              <DollarSign className="w-4 h-4" /> Stripe Available
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-[hsl(var(--neon-green,142_76%_50%))]" data-testid="text-platform-pending">
-              {fmt(pending)}
+            <div className="text-2xl font-bold text-[hsl(142,76%,50%)]" data-testid="text-stripe-available">
+              {balance.isLoading ? "…" : fmt(balance.data?.available ?? 0)}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Ready to withdraw</p>
+            <p className="text-xs text-muted-foreground mt-1">Ready in your Stripe balance</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-normal text-muted-foreground flex items-center gap-2">
-              <Banknote className="w-4 h-4" /> Platform Paid
+              <Banknote className="w-4 h-4" /> Stripe Pending
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-platform-paid">{fmt(earnings?.paidOut ?? 0)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Lifetime withdrawals</p>
+            <div className="text-2xl font-bold">{balance.isLoading ? "…" : fmt(balance.data?.pending ?? 0)}</div>
+            <p className="text-xs text-muted-foreground mt-1">Settling (typically 2 business days)</p>
           </CardContent>
         </Card>
         <Card>
@@ -133,139 +85,57 @@ export default function Moderation() {
       <Card className="mb-6">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Platform Bank Account</span>
-            {hasBank ? (
-              <Badge variant="outline" className="border-green-500 text-green-500">Linked</Badge>
-            ) : (
-              <Badge variant="outline" className="border-yellow-500 text-yellow-500">Not Linked</Badge>
-            )}
+            <span>Stripe Dashboard</span>
+            <Badge variant="outline" className="border-green-500 text-green-500">Connected</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {hasBank ? (
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-semibold" data-testid="text-platform-bank-name">{(bank as any).bankName}</p>
-                <p className="text-sm text-muted-foreground">
-                  {(bank as any).accountHolderName} • Account •••{(bank as any).last4}
-                </p>
-              </div>
-              <Dialog open={open} onOpenChange={setOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" data-testid="button-replace-platform-bank">Replace</Button>
-                </DialogTrigger>
-                <BankForm form={form} setForm={setForm} onSubmit={submitBank} loading={linkBank.isPending} />
-              </Dialog>
-            </div>
-          ) : (
-            <>
-              <p className="text-sm text-muted-foreground flex items-center gap-2">
-                <Lock className="w-4 h-4" />
-                Link your platform bank to withdraw the {fmt(pending)} in platform revenue.
+          <div className="p-4 rounded-md bg-card/50 border flex items-start gap-3">
+            <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+            <div className="text-sm space-y-2">
+              <p>
+                Your 40% platform cut accumulates in your Stripe balance. <strong>Stripe automatically pays it out to your linked bank</strong> on the schedule you set in your Stripe Dashboard (default: daily, 2-day rolling).
               </p>
-              <Dialog open={open} onOpenChange={setOpen}>
-                <DialogTrigger asChild>
-                  <Button data-testid="button-link-platform-bank" className="bg-primary">Link Platform Bank</Button>
-                </DialogTrigger>
-                <BankForm form={form} setForm={setForm} onSubmit={submitBank} loading={linkBank.isPending} />
-              </Dialog>
-            </>
-          )}
-
-          <div className="pt-4 border-t">
-            <Button
-              size="lg"
-              className="w-full bg-[hsl(var(--neon-green,142_76%_50%))] text-black hover:opacity-90"
-              disabled={!canWithdraw || requestPayout.isPending}
-              onClick={withdraw}
-              data-testid="button-platform-withdraw"
-            >
-              <ArrowDownToLine className="w-4 h-4 mr-2" />
-              {requestPayout.isPending ? "Processing…" : `Withdraw ${fmt(pending)}`}
-            </Button>
-            {!hasBank && (
-              <p className="text-xs text-muted-foreground mt-2 text-center">Link the platform bank above to enable withdrawals</p>
-            )}
-            {hasBank && pending <= 0 && (
-              <p className="text-xs text-muted-foreground mt-2 text-center">No platform revenue pending yet</p>
-            )}
+              <p className="text-muted-foreground">
+                To link your bank, change payout frequency, view detailed reports, or download tax documents, open the Stripe Dashboard below.
+              </p>
+            </div>
           </div>
+
+          <Button
+            size="lg"
+            className="w-full bg-primary"
+            onClick={() => dashboard.data?.url && window.open(dashboard.data.url, "_blank")}
+            disabled={!dashboard.data?.url}
+            data-testid="button-open-stripe-dashboard"
+          >
+            Open Stripe Dashboard <ExternalLink className="w-4 h-4 ml-2" />
+          </Button>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Platform Payout History</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle>Platform Economics</CardTitle></CardHeader>
         <CardContent>
-          {!payouts || payouts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No platform payouts yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {payouts.map((p) => (
-                <div
-                  key={p.id}
-                  className="flex items-center justify-between p-3 rounded-md bg-card/50 border"
-                  data-testid={`row-platform-payout-${p.id}`}
-                >
-                  <div>
-                    <p className="font-semibold">{fmt(Number(p.amount))}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(p.createdAt).toLocaleString()} • •••{p.bankLast4}
-                    </p>
-                  </div>
-                  <Badge variant="outline" className="border-green-500 text-green-500 capitalize">{p.status}</Badge>
-                </div>
-              ))}
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between p-2 border-b">
+              <span className="text-muted-foreground">Gross gift volume</span>
+              <span className="font-mono">{fmt(earnings?.totalGross ?? 0)}</span>
             </div>
-          )}
+            <div className="flex justify-between p-2 border-b">
+              <span className="text-muted-foreground">Streamer share (60%)</span>
+              <span className="font-mono text-muted-foreground">−{fmt(earnings?.streamerShare ?? 0)}</span>
+            </div>
+            <div className="flex justify-between p-2 border-b">
+              <span className="text-muted-foreground">Platform share (40%)</span>
+              <span className="font-mono text-[hsl(142,76%,50%)]">{fmt(earnings?.platformShare ?? 0)}</span>
+            </div>
+            <p className="text-xs text-muted-foreground pt-2">
+              Once you charge users for gifts via Stripe Checkout (next phase), the gross volume above lands in your Stripe balance and the 60% transfers automatically to each streamer's Stripe Connect account when they hit "Withdraw."
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-function BankForm({
-  form, setForm, onSubmit, loading,
-}: {
-  form: { bankName: string; accountNumber: string; routingNumber: string; accountHolderName: string };
-  setForm: (f: any) => void;
-  onSubmit: () => void;
-  loading: boolean;
-}) {
-  return (
-    <DialogContent data-testid="dialog-platform-bank">
-      <DialogHeader>
-        <DialogTitle>Link Platform Bank</DialogTitle>
-        <DialogDescription>This is where your 40% platform revenue will be deposited.</DialogDescription>
-      </DialogHeader>
-      <div className="space-y-3">
-        <div>
-          <Label>Bank Name</Label>
-          <Input value={form.bankName} onChange={(e) => setForm({ ...form, bankName: e.target.value })}
-            placeholder="Chase, Bank of America…" data-testid="input-platform-bank-name" />
-        </div>
-        <div>
-          <Label>Account Holder Name</Label>
-          <Input value={form.accountHolderName} onChange={(e) => setForm({ ...form, accountHolderName: e.target.value })}
-            placeholder="Business or legal name" data-testid="input-platform-holder" />
-        </div>
-        <div>
-          <Label>Routing Number</Label>
-          <Input value={form.routingNumber} onChange={(e) => setForm({ ...form, routingNumber: e.target.value })}
-            placeholder="9 digits" data-testid="input-platform-routing" />
-        </div>
-        <div>
-          <Label>Account Number</Label>
-          <Input value={form.accountNumber} onChange={(e) => setForm({ ...form, accountNumber: e.target.value })}
-            placeholder="Account number" data-testid="input-platform-account" />
-        </div>
-      </div>
-      <DialogFooter>
-        <Button onClick={onSubmit} disabled={loading} data-testid="button-submit-platform-bank">
-          {loading ? "Linking…" : "Link Account"}
-        </Button>
-      </DialogFooter>
-    </DialogContent>
   );
 }
