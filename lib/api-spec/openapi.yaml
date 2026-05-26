@@ -1,22 +1,39 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Clippzi API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: users
+    description: User profiles and social graph
+  - name: posts
+    description: Video and image posts
+  - name: livestreams
+    description: Live streaming
+  - name: gifts
+    description: Gift catalog and transactions
+  - name: shop
+    description: Clip Shop marketplace
+  - name: comments
+    description: Comments on posts
+  - name: notifications
+    description: User notifications
+  - name: moderation
+    description: AI content moderation
+  - name: feed
+    description: Content feeds and discovery
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +41,1068 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ── USERS ──
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: Search/list users
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get user profile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    patch:
+      operationId: updateUser
+      tags: [users]
+      summary: Update user profile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}/follow:
+    post:
+      operationId: followUser
+      tags: [users]
+      summary: Follow a user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FollowInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FollowResult"
+
+  /users/{id}/followers:
+    get:
+      operationId: getUserFollowers
+      tags: [users]
+      summary: Get followers of a user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+
+  /users/{id}/following:
+    get:
+      operationId: getUserFollowing
+      tags: [users]
+      summary: Get users that a user follows
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+
+  /users/{id}/stats:
+    get:
+      operationId: getUserStats
+      tags: [users]
+      summary: Get user stats (followers, views, earnings)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserStats"
+
+  /users/{id}/earnings:
+    get:
+      operationId: getUserEarnings
+      tags: [users]
+      summary: Get streamer earnings breakdown
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EarningsSummary"
+
+  /users/{id}/bank:
+    get:
+      operationId: getUserBankAccount
+      tags: [users]
+      summary: Get linked bank account info
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BankAccount"
+    post:
+      operationId: linkBankAccount
+      tags: [users]
+      summary: Link a bank account for payouts
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BankAccountInput"
+      responses:
+        "201":
+          description: Linked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BankAccount"
+
+  # ── POSTS ──
+  /posts:
+    get:
+      operationId: listPosts
+      tags: [posts]
+      summary: List posts (with optional filters)
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [video, image, all]
+            default: all
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Post"
+    post:
+      operationId: createPost
+      tags: [posts]
+      summary: Create a new post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+
+  /posts/trending:
+    get:
+      operationId: getTrendingPosts
+      tags: [posts]
+      summary: Get trending posts
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Post"
+
+  /posts/{id}:
+    get:
+      operationId: getPost
+      tags: [posts]
+      summary: Get a single post
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+    delete:
+      operationId: deletePost
+      tags: [posts]
+      summary: Delete a post
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /posts/{id}/like:
+    post:
+      operationId: likePost
+      tags: [posts]
+      summary: Like or unlike a post
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LikeInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LikeResult"
+
+  # ── FEED ──
+  /feed:
+    get:
+      operationId: getFeed
+      tags: [feed]
+      summary: Get personalized for-you feed
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Post"
+
+  /feed/following:
+    get:
+      operationId: getFollowingFeed
+      tags: [feed]
+      summary: Get feed from followed users
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Post"
+
+  /feed/stats:
+    get:
+      operationId: getFeedStats
+      tags: [feed]
+      summary: Get platform-wide stats (users, posts, live streams)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformStats"
+
+  # ── LIVE STREAMS ──
+  /livestreams:
+    get:
+      operationId: listLivestreams
+      tags: [livestreams]
+      summary: Get all active live streams
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Livestream"
+    post:
+      operationId: startLivestream
+      tags: [livestreams]
+      summary: Start a new live stream
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LivestreamInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Livestream"
+
+  /livestreams/{id}:
+    get:
+      operationId: getLivestream
+      tags: [livestreams]
+      summary: Get a live stream
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Livestream"
+    patch:
+      operationId: updateLivestream
+      tags: [livestreams]
+      summary: Update stream settings or end stream
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LivestreamUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Livestream"
+
+  /livestreams/{id}/viewers:
+    get:
+      operationId: getLivestreamViewers
+      tags: [livestreams]
+      summary: Get viewer count and list for a stream
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ViewerInfo"
+
+  # ── GIFTS ──
+  /gifts:
+    get:
+      operationId: listGifts
+      tags: [gifts]
+      summary: Get all available gifts
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: minPrice
+          in: query
+          schema:
+            type: ["number", "null"]
+        - name: maxPrice
+          in: query
+          schema:
+            type: ["number", "null"]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Gift"
+
+  /gifts/{id}:
+    get:
+      operationId: getGift
+      tags: [gifts]
+      summary: Get a single gift
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Gift"
+
+  /gifts/send:
+    post:
+      operationId: sendGift
+      tags: [gifts]
+      summary: Send a gift to a streamer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GiftSendInput"
+      responses:
+        "201":
+          description: Gift sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GiftTransaction"
+
+  /gifts/transactions:
+    get:
+      operationId: listGiftTransactions
+      tags: [gifts]
+      summary: List gift transactions (sent or received)
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: streamId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GiftTransaction"
+
+  /gifts/leaderboard:
+    get:
+      operationId: getGiftLeaderboard
+      tags: [gifts]
+      summary: Top gifters leaderboard
+      parameters:
+        - name: streamId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GifterRank"
+
+  # ── CLIP SHOP ──
+  /shop/products:
+    get:
+      operationId: listShopProducts
+      tags: [shop]
+      summary: List shop products
+      parameters:
+        - name: sellerId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: category
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: q
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ShopProduct"
+    post:
+      operationId: createShopProduct
+      tags: [shop]
+      summary: List a new product in the Clip Shop
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShopProductInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShopProduct"
+
+  /shop/products/{id}:
+    get:
+      operationId: getShopProduct
+      tags: [shop]
+      summary: Get a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShopProduct"
+    patch:
+      operationId: updateShopProduct
+      tags: [shop]
+      summary: Update a product listing
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShopProductUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShopProduct"
+    delete:
+      operationId: deleteShopProduct
+      tags: [shop]
+      summary: Remove a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /shop/orders:
+    get:
+      operationId: listShopOrders
+      tags: [shop]
+      summary: List orders (buyer or seller)
+      parameters:
+        - name: buyerId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: sellerId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: status
+          in: query
+          schema:
+            type: ["string", "null"]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ShopOrder"
+    post:
+      operationId: createShopOrder
+      tags: [shop]
+      summary: Place an order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShopOrderInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShopOrder"
+
+  /shop/orders/{id}:
+    patch:
+      operationId: updateShopOrder
+      tags: [shop]
+      summary: Update order status (ship, complete, cancel)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShopOrderUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShopOrder"
+
+  /shop/trending:
+    get:
+      operationId: getTrendingShopProducts
+      tags: [shop]
+      summary: Get trending Clip Shop products
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 12
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ShopProduct"
+
+  # ── COMMENTS ──
+  /comments:
+    get:
+      operationId: listComments
+      tags: [comments]
+      summary: List comments on a post
+      parameters:
+        - name: postId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Comment"
+    post:
+      operationId: createComment
+      tags: [comments]
+      summary: Add a comment to a post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommentInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+
+  /comments/{id}:
+    delete:
+      operationId: deleteComment
+      tags: [comments]
+      summary: Delete a comment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── NOTIFICATIONS ──
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List notifications for a user
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: unreadOnly
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+
+  /notifications/{id}/read:
+    patch:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark a notification as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationReadInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+
+  # ── MODERATION ──
+  /moderation/reports:
+    get:
+      operationId: listModerationReports
+      tags: [moderation]
+      summary: List content moderation reports
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: ["string", "null"]
+            enum: [pending, reviewed, actioned, dismissed, null]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ModerationReport"
+    post:
+      operationId: createModerationReport
+      tags: [moderation]
+      summary: Report content for moderation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationReportInput"
+      responses:
+        "201":
+          description: Report created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationReport"
+
+  /moderation/analyze:
+    post:
+      operationId: analyzeContent
+      tags: [moderation]
+      summary: AI-analyze text for bullying or drug content
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContentAnalysisInput"
+      responses:
+        "200":
+          description: Analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentAnalysisResult"
+
+  /moderation/reports/{id}:
+    patch:
+      operationId: resolveModerationReport
+      tags: [moderation]
+      summary: Resolve a moderation report
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModerationReportUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationReport"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +1113,480 @@ components:
       required:
         - status
 
+    # ── USER ──
+    User:
+      type: object
+      required: [id, username, displayName, createdAt]
+      properties:
+        id: { type: integer }
+        username: { type: string }
+        displayName: { type: string }
+        bio: { type: ["string", "null"] }
+        avatarUrl: { type: ["string", "null"] }
+        bannerUrl: { type: ["string", "null"] }
+        isVerified: { type: boolean }
+        isLive: { type: boolean }
+        followerCount: { type: integer }
+        followingCount: { type: integer }
+        postCount: { type: integer }
+        totalViews: { type: integer }
+        role: { type: string, enum: [user, streamer, admin] }
+        createdAt: { type: string }
+
+    UserInput:
+      type: object
+      required: [username, displayName, email]
+      properties:
+        username: { type: string }
+        displayName: { type: string }
+        email: { type: string }
+        bio: { type: string }
+        avatarUrl: { type: string }
+
+    UserUpdate:
+      type: object
+      properties:
+        displayName: { type: string }
+        bio: { type: string }
+        avatarUrl: { type: string }
+        bannerUrl: { type: string }
+        role: { type: string }
+
+    UserStats:
+      type: object
+      required: [userId, followerCount, followingCount, postCount, totalViews, totalGiftsReceived, totalEarnings, totalGiftsSent]
+      properties:
+        userId: { type: integer }
+        followerCount: { type: integer }
+        followingCount: { type: integer }
+        postCount: { type: integer }
+        totalViews: { type: integer }
+        totalGiftsReceived: { type: number }
+        totalEarnings: { type: number }
+        totalGiftsSent: { type: number }
+
+    EarningsSummary:
+      type: object
+      required: [userId, totalGrossEarnings, streamerShare, platformShare, pendingPayout, paidOut, transactions]
+      properties:
+        userId: { type: integer }
+        totalGrossEarnings: { type: number }
+        streamerShare: { type: number }
+        platformShare: { type: number }
+        pendingPayout: { type: number }
+        paidOut: { type: number }
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/GiftTransaction"
+
+    BankAccount:
+      type: object
+      required: [id, userId, bankName, last4, status]
+      properties:
+        id: { type: integer }
+        userId: { type: integer }
+        bankName: { type: string }
+        last4: { type: string }
+        routingNumber: { type: ["string", "null"] }
+        status: { type: string, enum: [pending, verified, failed] }
+        createdAt: { type: string }
+
+    BankAccountInput:
+      type: object
+      required: [bankName, accountNumber, routingNumber, accountHolderName]
+      properties:
+        bankName: { type: string }
+        accountNumber: { type: string }
+        routingNumber: { type: string }
+        accountHolderName: { type: string }
+
+    FollowInput:
+      type: object
+      required: [followerId, action]
+      properties:
+        followerId: { type: integer }
+        action: { type: string, enum: [follow, unfollow] }
+
+    FollowResult:
+      type: object
+      required: [following, followerCount]
+      properties:
+        following: { type: boolean }
+        followerCount: { type: integer }
+
+    # ── POST ──
+    Post:
+      type: object
+      required: [id, userId, type, createdAt, likeCount, commentCount, viewCount]
+      properties:
+        id: { type: integer }
+        userId: { type: integer }
+        user: { $ref: "#/components/schemas/User" }
+        type: { type: string, enum: [video, image] }
+        title: { type: ["string", "null"] }
+        description: { type: ["string", "null"] }
+        mediaUrl: { type: string }
+        thumbnailUrl: { type: ["string", "null"] }
+        musicTitle: { type: ["string", "null"] }
+        musicArtist: { type: ["string", "null"] }
+        musicUrl: { type: ["string", "null"] }
+        duration: { type: ["integer", "null"] }
+        likeCount: { type: integer }
+        commentCount: { type: integer }
+        viewCount: { type: integer }
+        shareCount: { type: integer }
+        tags:
+          type: array
+          items: { type: string }
+        isModerated: { type: boolean }
+        moderationStatus: { type: string, enum: [approved, pending, rejected] }
+        createdAt: { type: string }
+
+    PostInput:
+      type: object
+      required: [userId, type, mediaUrl]
+      properties:
+        userId: { type: integer }
+        type: { type: string, enum: [video, image] }
+        title: { type: string }
+        description: { type: string }
+        mediaUrl: { type: string }
+        thumbnailUrl: { type: string }
+        musicTitle: { type: string }
+        musicArtist: { type: string }
+        musicUrl: { type: string }
+        duration: { type: integer }
+        tags:
+          type: array
+          items: { type: string }
+
+    LikeInput:
+      type: object
+      required: [userId, liked]
+      properties:
+        userId: { type: integer }
+        liked: { type: boolean }
+
+    LikeResult:
+      type: object
+      required: [liked, likeCount]
+      properties:
+        liked: { type: boolean }
+        likeCount: { type: integer }
+
+    # ── LIVE STREAM ──
+    Livestream:
+      type: object
+      required: [id, userId, title, status, viewerCount, createdAt]
+      properties:
+        id: { type: integer }
+        userId: { type: integer }
+        user: { $ref: "#/components/schemas/User" }
+        title: { type: string }
+        description: { type: ["string", "null"] }
+        thumbnailUrl: { type: ["string", "null"] }
+        streamKey: { type: ["string", "null"] }
+        playbackUrl: { type: ["string", "null"] }
+        status: { type: string, enum: [live, ended, scheduled] }
+        viewerCount: { type: integer }
+        peakViewerCount: { type: integer }
+        totalGiftsReceived: { type: number }
+        activeFilter: { type: ["string", "null"] }
+        category: { type: ["string", "null"] }
+        startedAt: { type: ["string", "null"] }
+        endedAt: { type: ["string", "null"] }
+        createdAt: { type: string }
+
+    LivestreamInput:
+      type: object
+      required: [userId, title]
+      properties:
+        userId: { type: integer }
+        title: { type: string }
+        description: { type: string }
+        thumbnailUrl: { type: string }
+        category: { type: string }
+
+    LivestreamUpdate:
+      type: object
+      properties:
+        title: { type: string }
+        description: { type: string }
+        status: { type: string, enum: [live, ended] }
+        activeFilter: { type: string }
+        thumbnailUrl: { type: string }
+
+    ViewerInfo:
+      type: object
+      required: [streamId, viewerCount, viewers]
+      properties:
+        streamId: { type: integer }
+        viewerCount: { type: integer }
+        viewers:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+
+    # ── GIFTS ──
+    Gift:
+      type: object
+      required: [id, name, emoji, price, category, animationUrl]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        emoji: { type: string }
+        price: { type: number }
+        category: { type: string }
+        animationUrl: { type: ["string", "null"] }
+        iconUrl: { type: ["string", "null"] }
+        description: { type: ["string", "null"] }
+        rarity: { type: string, enum: [common, rare, epic, legendary] }
+        isActive: { type: boolean }
+
+    GiftTransaction:
+      type: object
+      required: [id, giftId, senderId, receiverId, amount, streamerShare, platformShare, createdAt]
+      properties:
+        id: { type: integer }
+        giftId: { type: integer }
+        gift: { $ref: "#/components/schemas/Gift" }
+        senderId: { type: integer }
+        sender: { $ref: "#/components/schemas/User" }
+        receiverId: { type: integer }
+        receiver: { $ref: "#/components/schemas/User" }
+        streamId: { type: ["integer", "null"] }
+        amount: { type: number }
+        streamerShare: { type: number }
+        platformShare: { type: number }
+        quantity: { type: integer }
+        message: { type: ["string", "null"] }
+        createdAt: { type: string }
+
+    GiftSendInput:
+      type: object
+      required: [giftId, senderId, receiverId, quantity]
+      properties:
+        giftId: { type: integer }
+        senderId: { type: integer }
+        receiverId: { type: integer }
+        streamId: { type: integer }
+        quantity: { type: integer }
+        message: { type: string }
+
+    GifterRank:
+      type: object
+      required: [rank, user, totalAmount, giftCount]
+      properties:
+        rank: { type: integer }
+        user: { $ref: "#/components/schemas/User" }
+        totalAmount: { type: number }
+        giftCount: { type: integer }
+
+    # ── CLIP SHOP ──
+    ShopProduct:
+      type: object
+      required: [id, sellerId, title, price, stock, category, createdAt]
+      properties:
+        id: { type: integer }
+        sellerId: { type: integer }
+        seller: { $ref: "#/components/schemas/User" }
+        title: { type: string }
+        description: { type: ["string", "null"] }
+        price: { type: number }
+        stock: { type: integer }
+        category: { type: string }
+        imageUrl: { type: ["string", "null"] }
+        imageUrls:
+          type: array
+          items: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+        rating: { type: ["number", "null"] }
+        reviewCount: { type: integer }
+        salesCount: { type: integer }
+        isActive: { type: boolean }
+        createdAt: { type: string }
+
+    ShopProductInput:
+      type: object
+      required: [sellerId, title, price, stock, category]
+      properties:
+        sellerId: { type: integer }
+        title: { type: string }
+        description: { type: string }
+        price: { type: number }
+        stock: { type: integer }
+        category: { type: string }
+        imageUrl: { type: string }
+        imageUrls:
+          type: array
+          items: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+
+    ShopProductUpdate:
+      type: object
+      properties:
+        title: { type: string }
+        description: { type: string }
+        price: { type: number }
+        stock: { type: integer }
+        isActive: { type: boolean }
+
+    ShopOrder:
+      type: object
+      required: [id, productId, buyerId, sellerId, quantity, totalAmount, status, createdAt]
+      properties:
+        id: { type: integer }
+        productId: { type: integer }
+        product: { $ref: "#/components/schemas/ShopProduct" }
+        buyerId: { type: integer }
+        buyer: { $ref: "#/components/schemas/User" }
+        sellerId: { type: integer }
+        quantity: { type: integer }
+        totalAmount: { type: number }
+        status: { type: string, enum: [pending, confirmed, shipped, delivered, cancelled, refunded] }
+        shippingAddress: { type: ["string", "null"] }
+        trackingNumber: { type: ["string", "null"] }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+
+    ShopOrderInput:
+      type: object
+      required: [productId, buyerId, quantity, shippingAddress]
+      properties:
+        productId: { type: integer }
+        buyerId: { type: integer }
+        quantity: { type: integer }
+        shippingAddress: { type: string }
+
+    ShopOrderUpdate:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [confirmed, shipped, delivered, cancelled, refunded] }
+        trackingNumber: { type: string }
+
+    # ── COMMENTS ──
+    Comment:
+      type: object
+      required: [id, postId, userId, text, createdAt]
+      properties:
+        id: { type: integer }
+        postId: { type: integer }
+        userId: { type: integer }
+        user: { $ref: "#/components/schemas/User" }
+        text: { type: string }
+        likeCount: { type: integer }
+        isFlagged: { type: boolean }
+        createdAt: { type: string }
+
+    CommentInput:
+      type: object
+      required: [userId, text]
+      properties:
+        userId: { type: integer }
+        text: { type: string }
+
+    # ── NOTIFICATIONS ──
+    Notification:
+      type: object
+      required: [id, userId, type, message, isRead, createdAt]
+      properties:
+        id: { type: integer }
+        userId: { type: integer }
+        type: { type: string, enum: [follow, like, comment, gift, live, shop_order, moderation] }
+        message: { type: string }
+        isRead: { type: boolean }
+        relatedUserId: { type: ["integer", "null"] }
+        relatedPostId: { type: ["integer", "null"] }
+        relatedStreamId: { type: ["integer", "null"] }
+        createdAt: { type: string }
+
+    NotificationReadInput:
+      type: object
+      required: [isRead]
+      properties:
+        isRead: { type: boolean }
+
+    # ── MODERATION ──
+    ModerationReport:
+      type: object
+      required: [id, reporterId, contentType, contentId, reason, status, createdAt]
+      properties:
+        id: { type: integer }
+        reporterId: { type: integer }
+        reporter: { $ref: "#/components/schemas/User" }
+        contentType: { type: string, enum: [post, comment, user, stream] }
+        contentId: { type: integer }
+        reason: { type: string, enum: [bullying, harassment, drugs, spam, nudity, violence, other] }
+        description: { type: ["string", "null"] }
+        status: { type: string, enum: [pending, reviewed, actioned, dismissed] }
+        aiScore: { type: ["number", "null"] }
+        aiFlags:
+          type: array
+          items: { type: string }
+        resolvedAt: { type: ["string", "null"] }
+        createdAt: { type: string }
+
+    ModerationReportInput:
+      type: object
+      required: [reporterId, contentType, contentId, reason]
+      properties:
+        reporterId: { type: integer }
+        contentType: { type: string, enum: [post, comment, user, stream] }
+        contentId: { type: integer }
+        reason: { type: string, enum: [bullying, harassment, drugs, spam, nudity, violence, other] }
+        description: { type: string }
+
+    ModerationReportUpdate:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [reviewed, actioned, dismissed] }
+
+    ContentAnalysisInput:
+      type: object
+      required: [text]
+      properties:
+        text: { type: string }
+        context: { type: ["string", "null"] }
+
+    ContentAnalysisResult:
+      type: object
+      required: [isSafe, score, flags]
+      properties:
+        isSafe: { type: boolean }
+        score: { type: number }
+        flags:
+          type: array
+          items: { type: string }
+        categories:
+          type: object
+          properties:
+            bullying: { type: number }
+            drugUse: { type: number }
+            harassment: { type: number }
+            spam: { type: number }
+        recommendation: { type: string, enum: [allow, warn, block, review] }
+
+    # ── PLATFORM STATS ──
+    PlatformStats:
+      type: object
+      required: [totalUsers, totalPosts, activeLivestreams, totalGiftsSent, totalShopProducts]
+      properties:
+        totalUsers: { type: integer }
+        totalPosts: { type: integer }
+        activeLivestreams: { type: integer }
+        totalGiftsSent: { type: integer }
+        totalShopProducts: { type: integer }
+        topStreamers:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        trendingTags:
+          type: array
+          items: { type: string }

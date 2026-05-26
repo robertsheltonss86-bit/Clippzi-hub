@@ -1,0 +1,26 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "YlEjaJha0rdFjd9ozMkba"
+uri = "file://artifacts/clippzi/src/assets/logo.png"
+type = "image"
+title = "Clippzi flame logo"
+
+[[generated]]
+id = "kN75H_tu4auwshJ15VIiK"
+uri = "file://artifacts/clippzi/src/assets/avatar1.png"
+type = "image"
+title = "Diverse creator avatar 1"
+
+[[generated]]
+id = "2vp4N60gJz9jtTiJWY9pO"
+uri = "file://artifacts/clippzi/src/assets/avatar2.png"
+type = "image"
+title = "Diverse creator avatar 2"
+
+[[generated]]
+id = "OLTLMfNyVVTz0XQlHvSwx"
+uri = "file://artifacts/clippzi/src/assets/avatar3.png"
+type = "image"
+title = "Diverse creator avatar 3"
