@@ -9,6 +9,7 @@ import {
   ListGiftTransactionsQueryParams,
   GetGiftLeaderboardQueryParams,
 } from "@workspace/api-zod";
+import { requireAdmin } from "../middlewares/authMiddleware";
 
 const router = Router();
 
@@ -38,8 +39,9 @@ router.get("/gifts/:id", async (req, res) => {
   }
 });
 
-// POST /gifts/send
-router.post("/gifts/send", async (req, res) => {
+// POST /gifts/send — ADMIN-ONLY direct ledger write (test/backfill).
+// Real gift purchases go through POST /checkout/gift which charges the sender via Stripe.
+router.post("/gifts/send", requireAdmin, async (req, res) => {
   try {
     const body = SendGiftBody.parse(req.body);
     const [gift] = await db.select().from(giftsTable).where(eq(giftsTable.id, body.giftId));

@@ -1,8 +1,11 @@
 import { Router } from "express";
 import { db, giftTransactionsTable, platformBankTable, platformPayoutsTable } from "@workspace/db";
 import { sql, eq, desc } from "drizzle-orm";
+import { requireAdmin } from "../middlewares/authMiddleware";
 
 const router = Router();
+
+router.use("/platform", requireAdmin);
 
 router.get("/platform/earnings", async (_req, res) => {
   try {

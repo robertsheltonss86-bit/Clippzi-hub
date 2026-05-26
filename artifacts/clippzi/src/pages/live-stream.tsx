@@ -9,10 +9,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-
-const CURRENT_USER_ID = 1;
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 export default function LiveStream() {
+  const { userId: CURRENT_USER_ID, isAuthenticated, login } = useCurrentUser();
   const { id } = useParams();
   const streamId = parseInt(id || "0");
   const { toast } = useToast();
@@ -53,24 +53,27 @@ export default function LiveStream() {
 
   const refreshStream = () => queryClient.invalidateQueries({ queryKey: getGetLivestreamQueryKey(streamId) });
 
-  const handleSendGift = (giftId: number, name: string, price: number) => {
-    sendGiftMutation.mutate(
-      { data: { giftId, senderId: CURRENT_USER_ID, receiverId: stream?.userId || 0, streamId, quantity: 1 } },
-      {
-        onSuccess: () => {
-          toast({ title: "Gift Sent! 🎁", description: `You sent a ${name} to ${stream?.user?.displayName}` });
-          if (battleActive) {
-            addBattleScore.mutate(
-              { id: streamId, data: { points: price } },
-              {
-                onSuccess: refreshStream,
-                onError: () => toast({ title: "Score not added", description: "Battle may have just ended.", variant: "destructive" }),
-              },
-            );
-          }
-        },
-      },
-    );
+  const handleSendGift = async (giftId: number, name: string, price: number) => {
+    if (!isAuthenticated || !CURRENT_USER_ID) { login(); return; }
+    if (!stream?.userId) return;
+    try {
+      const base = import.meta.env.BASE_URL;
+      const r = await fetch(`${base}api/checkout/gift`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ giftId, receiverId: stream.userId, streamId, quantity: 1 }),
+      });
+      const data = await r.json();
+      if (!r.ok || !data.url) {
+        toast({ title: "Checkout failed", description: data.error ?? `HTTP ${r.status}`, variant: "destructive" });
+        return;
+      }
+      toast({ title: "Opening Stripe Checkout…", description: `Pay $${price.toFixed(2)} to send ${name}` });
+      window.location.href = data.url;
+    } catch (e: any) {
+      toast({ title: "Checkout failed", description: String(e?.message ?? e), variant: "destructive" });
+    }
   };
 
   const handleStartBattle = (opponentStreamId: number) => {

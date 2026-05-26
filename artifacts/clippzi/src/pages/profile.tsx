@@ -10,8 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Camera, Edit2, CheckCircle, Heart, Play, Users, Video, Eye, BadgeCheck, DollarSign } from "lucide-react";
-
-const CURRENT_USER_ID = 1;
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 function StatBox({ label, value }: { label: string; value: string | number }) {
   return (
@@ -84,8 +83,9 @@ function UploadableImage({
 
 export default function Profile() {
   const params = useParams<{ id: string }>();
-  const userId = Number(params.id) || CURRENT_USER_ID;
-  const isOwnProfile = userId === CURRENT_USER_ID;
+  const { userId: meId, isAuthenticated, login } = useCurrentUser();
+  const userId = Number(params.id) || meId || 0;
+  const isOwnProfile = !!meId && userId === meId;
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -139,8 +139,9 @@ export default function Profile() {
   };
 
   const handleFollow = () => {
+    if (!isAuthenticated || !meId) { login(); return; }
     followUser.mutate(
-      { data: { followerId: CURRENT_USER_ID, action: "follow" } },
+      { data: { followerId: meId, action: "follow" } },
       { onSuccess: () => { toast({ title: `Following @${user?.username}` }); refetchUser(); } }
     );
   };

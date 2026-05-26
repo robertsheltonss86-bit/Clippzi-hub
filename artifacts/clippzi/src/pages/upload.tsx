@@ -8,11 +8,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Upload as UploadIcon, Video, Image as ImageIcon, Music, X, CheckCircle } from "lucide-react";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 export default function Upload() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const createPostMutation = useCreatePost();
+  const { userId, isAuthenticated, login } = useCurrentUser();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [type, setType] = useState<"video" | "image">("video");
@@ -73,6 +75,11 @@ export default function Upload() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAuthenticated || !userId) {
+      toast({ title: "Login required", description: "Sign in to post." });
+      login();
+      return;
+    }
     if (!uploadedObjectPath) {
       toast({ title: "No file uploaded", description: "Please wait for the file to finish uploading.", variant: "destructive" });
       return;
@@ -84,7 +91,7 @@ export default function Upload() {
     const mediaUrl = `/api/storage${uploadedObjectPath}`;
     createPostMutation.mutate({
       data: {
-        userId: 1,
+        userId,
         type,
         title,
         description,

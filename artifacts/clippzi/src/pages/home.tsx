@@ -5,10 +5,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-
-const CURRENT_USER_ID = 1;
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 export default function Home() {
+  const { userId, isAuthenticated, login } = useCurrentUser();
   const { data: posts, isLoading } = useGetFeed(undefined, { query: { queryKey: getGetFeedQueryKey() } });
   const { data: streams } = useListLivestreams();
   const queryClient = useQueryClient();
@@ -21,11 +21,12 @@ export default function Home() {
   const [shareDeltas, setShareDeltas] = useState<Record<number, number>>({});
 
   const handleLike = (postId: number) => {
+    if (!isAuthenticated || !userId) { login(); return; }
     const liked = !likedMap[postId];
     setLikedMap((m) => ({ ...m, [postId]: liked }));
     setLikeDeltas((d) => ({ ...d, [postId]: (d[postId] ?? 0) + (liked ? 1 : -1) }));
     likeMutation.mutate(
-      { id: postId, data: { userId: CURRENT_USER_ID, liked } },
+      { id: postId, data: { userId, liked } },
       {
         onSuccess: async () => {
           await queryClient.invalidateQueries({ queryKey: getGetFeedQueryKey() });

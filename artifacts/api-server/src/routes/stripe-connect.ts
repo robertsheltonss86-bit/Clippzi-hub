@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db, usersTable, giftTransactionsTable, payoutsTable } from "@workspace/db";
 import { eq, sql, and, desc, inArray } from "drizzle-orm";
 import { getUncachableStripeClient } from "../lib/stripeClient";
+import { requireSelf, requireAdmin } from "../middlewares/authMiddleware";
 
 const router = Router();
 
@@ -12,7 +13,7 @@ function appOrigin(req: any): string {
 }
 
 // POST /users/:id/stripe/onboard — create or refresh Express account + onboarding link
-router.post("/users/:id/stripe/onboard", async (req, res) => {
+router.post("/users/:id/stripe/onboard", requireSelf("id"), async (req, res) => {
   try {
     const id = Number(req.params.id);
     const [user] = await db.select().from(usersTable).where(eq(usersTable.id, id));
@@ -49,7 +50,7 @@ router.post("/users/:id/stripe/onboard", async (req, res) => {
 });
 
 // GET /users/:id/stripe/status — onboarding/payout readiness
-router.get("/users/:id/stripe/status", async (req, res) => {
+router.get("/users/:id/stripe/status", requireSelf("id"), async (req, res) => {
   try {
     const id = Number(req.params.id);
     const [user] = await db.select().from(usersTable).where(eq(usersTable.id, id));
@@ -79,7 +80,7 @@ router.get("/users/:id/stripe/status", async (req, res) => {
 });
 
 // POST /users/:id/stripe/login-link — dashboard link for streamer
-router.post("/users/:id/stripe/login-link", async (req, res) => {
+router.post("/users/:id/stripe/login-link", requireSelf("id"), async (req, res) => {
   try {
     const id = Number(req.params.id);
     const [user] = await db.select().from(usersTable).where(eq(usersTable.id, id));
@@ -93,7 +94,7 @@ router.post("/users/:id/stripe/login-link", async (req, res) => {
 });
 
 // POST /users/:id/stripe/payout — transfer pending earnings to streamer's connected account
-router.post("/users/:id/stripe/payout", async (req, res) => {
+router.post("/users/:id/stripe/payout", requireSelf("id"), async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "Invalid user id" });
@@ -165,7 +166,7 @@ router.post("/users/:id/stripe/payout", async (req, res) => {
 });
 
 // GET /platform/stripe/balance — platform's Stripe balance (your 40% share)
-router.get("/platform/stripe/balance", async (_req, res) => {
+router.get("/platform/stripe/balance", requireAdmin, async (_req, res) => {
   try {
     const stripe = await getUncachableStripeClient();
     const bal = await stripe.balance.retrieve();
@@ -182,7 +183,7 @@ router.get("/platform/stripe/balance", async (_req, res) => {
 });
 
 // GET /platform/stripe/dashboard — link to Stripe Dashboard
-router.get("/platform/stripe/dashboard", async (_req, res) => {
+router.get("/platform/stripe/dashboard", requireAdmin, async (_req, res) => {
   const isLive = process.env["REPLIT_DEPLOYMENT"] === "1";
   res.json({ url: isLive ? "https://dashboard.stripe.com/" : "https://dashboard.stripe.com/test" });
 });

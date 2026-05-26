@@ -10,10 +10,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-
-const CURRENT_USER_ID = 1;
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 export default function LiveBrowser() {
+  const { userId, isAuthenticated, login } = useCurrentUser();
   const { data: streams, isLoading } = useListLivestreams(undefined, { query: { queryKey: getListLivestreamsQueryKey() } });
   const startMutation = useStartLivestream();
   const queryClient = useQueryClient();
@@ -25,12 +25,13 @@ export default function LiveBrowser() {
   const [category, setCategory] = useState("");
 
   const handleGoLive = () => {
+    if (!isAuthenticated || !userId) { login(); return; }
     if (!title.trim()) {
       toast({ title: "Title is required", variant: "destructive" });
       return;
     }
     startMutation.mutate(
-      { data: { userId: CURRENT_USER_ID, title: title.trim(), description: description.trim() || undefined, category: category.trim() || undefined } },
+      { data: { userId, title: title.trim(), description: description.trim() || undefined, category: category.trim() || undefined } },
       {
         onSuccess: (stream) => {
           queryClient.invalidateQueries({ queryKey: getListLivestreamsQueryKey() });

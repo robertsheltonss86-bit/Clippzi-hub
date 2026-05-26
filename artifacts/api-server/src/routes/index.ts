@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import authRouter from "./auth";
 import usersRouter from "./users";
 import postsRouter from "./posts";
 import livestreamsRouter from "./livestreams";
@@ -9,10 +10,12 @@ import moderationRouter from "./moderation";
 import storageRouter from "./storage";
 import platformRouter from "./platform";
 import stripeConnectRouter from "./stripe-connect";
+import checkoutRouter from "./checkout";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(authRouter);
 router.use(usersRouter);
 router.use(postsRouter);
 router.use(livestreamsRouter);
@@ -22,5 +25,6 @@ router.use(moderationRouter);
 router.use(storageRouter);
 router.use(platformRouter);
 router.use(stripeConnectRouter);
+router.use(checkoutRouter);
 
 export default router;
