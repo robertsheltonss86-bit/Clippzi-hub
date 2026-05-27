@@ -111,10 +111,14 @@ router.delete("/posts/:id", requireAuth, async (req, res) => {
     if (!isAdmin && post.userId !== userId) {
       return res.status(403).json({ error: "You can only delete your own posts" });
     }
-    await db.delete(postsTable).where(eq(postsTable.id, id));
-    await db.update(usersTable)
-      .set({ postCount: sql`GREATEST(${usersTable.postCount} - 1, 0)` })
-      .where(eq(usersTable.id, post.userId));
+    await db.transaction(async (tx) => {
+      await tx.delete(postLikesTable).where(eq(postLikesTable.postId, id));
+      await tx.delete(commentsTable).where(eq(commentsTable.postId, id));
+      await tx.delete(postsTable).where(eq(postsTable.id, id));
+      await tx.update(usersTable)
+        .set({ postCount: sql`GREATEST(${usersTable.postCount} - 1, 0)` })
+        .where(eq(usersTable.id, post.userId));
+    });
     res.status(204).send();
   } catch (e) {
     res.status(400).json({ error: String(e) });
