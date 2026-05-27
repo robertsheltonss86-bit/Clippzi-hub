@@ -40,9 +40,52 @@ function genInviteCode(): string {
   return s;
 }
 
+// In-memory host heartbeats. Touched on every host livekit-token request.
+// Any "live" stream whose last heartbeat is older than HEARTBEAT_TIMEOUT_MS is auto-ended.
+const hostHeartbeats = new Map<number, number>();
+const HEARTBEAT_TIMEOUT_MS = 90_000; // 90 seconds without a host token request = stale
+const NO_HEARTBEAT_GRACE_MS = 300_000; // 5 min after start to first heartbeat
+
+export function touchHostHeartbeat(streamId: number) {
+  hostHeartbeats.set(streamId, Date.now());
+}
+
+async function sweepStaleStreams() {
+  try {
+    const now = Date.now();
+    const liveStreams = await db.select().from(livestreamsTable).where(eq(livestreamsTable.status, "live"));
+    const staleIds: number[] = [];
+    for (const s of liveStreams) {
+      const beat = hostHeartbeats.get(s.id);
+      if (beat) {
+        // Only end if a beat exists AND it's older than the timeout. This avoids
+        // false positives after a server restart (where in-memory beats are lost).
+        if (now - beat > HEARTBEAT_TIMEOUT_MS) staleIds.push(s.id);
+      } else {
+        // Seed a beat so the next sweep can judge fairly. Never end on first sight.
+        hostHeartbeats.set(s.id, now);
+      }
+    }
+    if (staleIds.length > 0) {
+      await db.update(livestreamsTable)
+        .set({ status: "ended", endedAt: new Date() })
+        .where(and(eq(livestreamsTable.status, "live"), inArray(livestreamsTable.id, staleIds)));
+      const staleUserIds = liveStreams.filter(s => staleIds.includes(s.id)).map(s => s.userId);
+      if (staleUserIds.length > 0) {
+        await db.update(usersTable).set({ isLive: false }).where(inArray(usersTable.id, staleUserIds));
+      }
+      for (const id of staleIds) hostHeartbeats.delete(id);
+    }
+  } catch (e) {
+    // best-effort — never fail the request because of sweep
+    console.error("sweepStaleStreams error", e);
+  }
+}
+
 // GET /livestreams
 router.get("/livestreams", async (req, res) => {
   try {
+    await sweepStaleStreams();
     const query = ListLivestreamsQueryParams.parse(req.query);
     const streams = await db.select().from(livestreamsTable)
       .where(eq(livestreamsTable.status, "live"))
@@ -94,6 +137,11 @@ router.get("/livestreams/:id", async (req, res) => {
     const { id } = GetLivestreamParams.parse({ id: Number(req.params.id) });
     const [stream] = await db.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
     if (!stream) return res.status(404).json({ error: "Stream not found" });
+    // If the requester is the host and the stream is live, record a heartbeat
+    // so the stale-stream sweeper knows this stream is still active.
+    if (stream.status === "live" && req.user?.appUserId === stream.userId) {
+      touchHostHeartbeat(id);
+    }
     await db.update(livestreamsTable).set({ viewerCount: sql`${livestreamsTable.viewerCount} + 1` }).where(eq(livestreamsTable.id, id));
     res.json(await enrichStream(stream));
   } catch (e) {
@@ -338,6 +386,7 @@ router.post("/livestreams/:id/livekit-token", async (req, res) => {
     if (!stream) return res.status(404).json({ error: "Stream not found" });
     const me = req.user?.appUserId;
     const isHost = !!me && me === stream.userId;
+    if (isHost && stream.status === "live") touchHostHeartbeat(id);
     // Check approved cohost (group mode)
     let isCohost = false;
     if (!isHost && me && stream.mode === "group") {

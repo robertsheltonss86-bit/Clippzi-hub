@@ -448,7 +448,7 @@ export default function LiveStream() {
               )}
             </div>
 
-            {/* RIGHT: actions (icon-only on mobile) */}
+            {/* RIGHT: just End Live (host) — everything else moved to right rail */}
             <div className="flex items-center gap-1.5 shrink-0">
               {isOwnStream && (
                 <Button
@@ -460,24 +460,6 @@ export default function LiveStream() {
                 >
                   <X className="w-3.5 h-3.5" /> {endingStream ? "Ending…" : "End"}
                 </Button>
-              )}
-              {battleActive ? (
-                <Button onClick={handleEndBattle} size="icon" className="rounded-full bg-red-600 hover:bg-red-700 text-white h-8 w-8" data-testid="button-end-battle" title="End battle">
-                  <Swords className="w-4 h-4" />
-                </Button>
-              ) : isOwnStream ? (
-                <Button onClick={() => setBattleOpen(true)} size="icon" className="rounded-full bg-accent hover:bg-accent/80 text-black h-8 w-8" data-testid="button-start-battle" title={battleReqs.outgoing.length > 0 ? "Waiting for opponent" : "Start battle"}>
-                  <Swords className="w-4 h-4" />
-                </Button>
-              ) : null}
-              {(isOwnStream || isGroup) && <CohostPanel streamId={streamId} isHost={isOwnStream} />}
-              <Button onClick={handleShare} size="icon" variant="ghost" className="rounded-full bg-black/60 backdrop-blur border border-white/10 h-8 w-8 text-white hover:bg-black/80" data-testid="button-share-stream" title="Share">
-                <Share2 className="w-4 h-4" />
-              </Button>
-              {!isOwnStream && (
-                <div className="hidden sm:flex items-center gap-1.5 bg-black/60 backdrop-blur px-2.5 py-1.5 rounded-full border border-white/10 text-white text-xs font-semibold">
-                  <Users className="w-3.5 h-3.5 text-primary" /> {stream?.viewerCount ?? 0}
-                </div>
               )}
             </div>
           </div>
@@ -497,42 +479,71 @@ export default function LiveStream() {
             </div>
           )}
 
-          {!battleActive && isOwnStream && (
-            <div className="pointer-events-auto self-start">
-              <Sheet>
-                <SheetTrigger asChild>
-                  <button
-                    className="flex items-center gap-2 bg-black/60 backdrop-blur px-3 py-2 rounded-full border border-white/10 hover:bg-black/80 transition-colors"
-                    data-testid="button-open-filters"
-                  >
-                    <Filter className="w-4 h-4 text-accent" />
-                    <span className="text-xs text-white font-bold">{activeFilter === "None" ? "Filters" : activeFilter}</span>
-                  </button>
-                </SheetTrigger>
-                <SheetContent side="bottom" className="bg-card border-border h-auto max-h-[60vh]">
-                  <SheetHeader>
-                    <SheetTitle className="text-white flex items-center gap-2"><Filter className="w-5 h-5 text-accent" /> Face Filters</SheetTitle>
-                  </SheetHeader>
-                  <p className="text-xs text-muted-foreground mt-1 mb-4">Only you see the filter while testing — viewers see your raw camera. Tap one to preview.</p>
-                  <div className="grid grid-cols-3 gap-2 pb-4">
-                    {filters.map((f) => (
-                      <button
-                        key={f}
-                        onClick={() => setActiveFilter(f)}
-                        className={`px-3 py-3 rounded-xl text-sm font-bold transition-all border-2 ${
-                          activeFilter === f
-                            ? "bg-accent text-black border-accent scale-[1.03]"
-                            : "bg-black/40 text-white border-white/10 hover:bg-black/60"
-                        }`}
-                        data-testid={`button-filter-${f.toLowerCase().replace("&", "and")}`}
-                      >
-                        {f}
-                      </button>
-                    ))}
+          <div />
+        </div>
+
+        {/* TIKTOK-STYLE RIGHT RAIL — vertical action stack, above chat overlay */}
+        <div className="pointer-events-auto absolute right-2 z-40 flex flex-col items-center gap-3" style={{ bottom: "42%" }}>
+          {!isOwnStream && (
+            <button onClick={handleShare} className="flex flex-col items-center gap-0.5 group" data-testid="button-share-stream" title="Share">
+              <div className="w-11 h-11 rounded-full bg-black/60 backdrop-blur border border-white/10 flex items-center justify-center group-active:scale-95 transition-transform">
+                <Share2 className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-[10px] text-white font-semibold drop-shadow">Share</span>
+            </button>
+          )}
+          {(isOwnStream || isGroup) && (
+            <CohostPanel streamId={streamId} isHost={isOwnStream} />
+          )}
+          {isOwnStream && !battleActive && (
+            <button onClick={() => setBattleOpen(true)} className="flex flex-col items-center gap-0.5 group" data-testid="button-start-battle" title={battleReqs.outgoing.length > 0 ? "Waiting…" : "Battle"}>
+              <div className="w-11 h-11 rounded-full bg-accent flex items-center justify-center group-active:scale-95 transition-transform shadow-[0_0_12px_rgba(34,197,94,0.5)]">
+                <Swords className="w-5 h-5 text-black" />
+              </div>
+              <span className="text-[10px] text-white font-semibold drop-shadow">{battleReqs.outgoing.length > 0 ? "Waiting" : "Battle"}</span>
+            </button>
+          )}
+          {isOwnStream && battleActive && (
+            <button onClick={handleEndBattle} className="flex flex-col items-center gap-0.5 group" data-testid="button-end-battle" title="End battle">
+              <div className="w-11 h-11 rounded-full bg-red-600 flex items-center justify-center group-active:scale-95 transition-transform">
+                <Swords className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-[10px] text-white font-semibold drop-shadow">End battle</span>
+            </button>
+          )}
+          {isOwnStream && !battleActive && (
+            <Sheet>
+              <SheetTrigger asChild>
+                <button className="flex flex-col items-center gap-0.5 group" data-testid="button-open-filters" title="Filters">
+                  <div className={`w-11 h-11 rounded-full backdrop-blur border flex items-center justify-center group-active:scale-95 transition-transform ${activeFilter !== "None" ? "bg-accent border-accent shadow-[0_0_12px_rgba(34,197,94,0.5)]" : "bg-black/60 border-white/10"}`}>
+                    <Filter className={`w-5 h-5 ${activeFilter !== "None" ? "text-black" : "text-white"}`} />
                   </div>
-                </SheetContent>
-              </Sheet>
-            </div>
+                  <span className="text-[10px] text-white font-semibold drop-shadow truncate max-w-[60px]">{activeFilter === "None" ? "Filter" : activeFilter}</span>
+                </button>
+              </SheetTrigger>
+              <SheetContent side="bottom" className="bg-card border-border h-auto max-h-[60vh]">
+                <SheetHeader>
+                  <SheetTitle className="text-white flex items-center gap-2"><Filter className="w-5 h-5 text-accent" /> Face Filters</SheetTitle>
+                </SheetHeader>
+                <p className="text-xs text-muted-foreground mt-1 mb-4">Only you see the filter — viewers see your raw camera. Tap one to preview.</p>
+                <div className="grid grid-cols-3 gap-2 pb-4">
+                  {filters.map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setActiveFilter(f)}
+                      className={`px-3 py-3 rounded-xl text-sm font-bold transition-all border-2 ${
+                        activeFilter === f
+                          ? "bg-accent text-black border-accent scale-[1.03]"
+                          : "bg-black/40 text-white border-white/10 hover:bg-black/60"
+                      }`}
+                      data-testid={`button-filter-${f.toLowerCase().replace("&", "and")}`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              </SheetContent>
+            </Sheet>
           )}
         </div>
 
