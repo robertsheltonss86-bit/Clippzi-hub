@@ -102,8 +102,24 @@ export default function Home() {
             className="relative h-full w-full snap-start snap-always flex items-center justify-center bg-black/90"
           >
             <div className="absolute inset-0 w-full h-full">
-              <img src={post.mediaUrl || "https://images.unsplash.com/photo-1549490349-8643362247b5"} alt={post.title || ""} className="w-full h-full object-cover opacity-80" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent" />
+              {post.type === "video" && post.mediaUrl ? (
+                <video
+                  src={post.mediaUrl}
+                  className="w-full h-full object-cover"
+                  loop
+                  playsInline
+                  controls
+                  autoPlay
+                  data-testid={`video-post-${post.id}`}
+                />
+              ) : (
+                <img
+                  src={post.mediaUrl || "https://images.unsplash.com/photo-1549490349-8643362247b5"}
+                  alt={post.title || ""}
+                  className="w-full h-full object-cover opacity-80"
+                />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent pointer-events-none" />
             </div>
 
             <div className="absolute right-4 bottom-24 flex flex-col items-center gap-6">
