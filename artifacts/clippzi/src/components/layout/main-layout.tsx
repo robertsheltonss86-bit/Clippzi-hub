@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 export function MainLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { isAuthenticated, isAdmin, userId, user, login, logout, isLoading } = useCurrentUser();
+  const isImmersive = /^\/live\/[^/]+$/.test(location);
 
   const baseItems = [
     { href: "/", icon: Home, label: "For You" },
@@ -71,26 +72,28 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="flex-1 relative overflow-hidden flex flex-col">
-        <header className="md:hidden flex items-center justify-between p-4 border-b border-border bg-background z-50 absolute top-0 w-full">
-          <Link href="/">
-            <div className="cursor-pointer"><AnimatedLogo /></div>
-          </Link>
-          <div className="flex gap-4 items-center">
-            {!isLoading && (isAuthenticated ? (
-              <button onClick={logout} className="text-sm text-muted-foreground" data-testid="button-logout-mobile">Logout</button>
-            ) : (
-              <button onClick={login} className="text-sm font-semibold text-primary" data-testid="button-login-mobile">Login</button>
-            ))}
-            <Link href="/notifications"><Bell className="w-6 h-6 text-foreground cursor-pointer" /></Link>
-          </div>
-        </header>
+        {!isImmersive && (
+          <header className="md:hidden flex items-center justify-between p-4 border-b border-border bg-background z-50 absolute top-0 w-full">
+            <Link href="/">
+              <div className="cursor-pointer"><AnimatedLogo /></div>
+            </Link>
+            <div className="flex gap-4 items-center">
+              {!isLoading && (isAuthenticated ? (
+                <button onClick={logout} className="text-sm text-muted-foreground" data-testid="button-logout-mobile">Logout</button>
+              ) : (
+                <button onClick={login} className="text-sm font-semibold text-primary" data-testid="button-login-mobile">Login</button>
+              ))}
+              <Link href="/notifications"><Bell className="w-6 h-6 text-foreground cursor-pointer" /></Link>
+            </div>
+          </header>
+        )}
 
-        <div className="flex-1 overflow-y-auto h-full w-full pb-[60px] md:pb-0 pt-[70px] md:pt-0 scroll-smooth">
+        <div className={`flex-1 overflow-y-auto h-full w-full scroll-smooth ${isImmersive ? "" : "pb-[60px] md:pb-0 pt-[70px] md:pt-0"}`}>
           {children}
         </div>
       </main>
 
-      <nav className="md:hidden absolute bottom-0 w-full h-[60px] border-t border-border bg-background flex items-center justify-around px-2 z-50">
+      <nav className={`${isImmersive ? "hidden" : "md:hidden"} absolute bottom-0 w-full h-[60px] border-t border-border bg-background flex items-center justify-around px-2 z-50`}>
         {navItems.slice(0, 5).map((item) => {
           const isActive = location === item.href;
           const Icon = item.icon;

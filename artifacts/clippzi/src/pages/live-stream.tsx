@@ -13,7 +13,7 @@ import {
 } from "@workspace/api-client-react";
 import { useParams, useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Gift as GiftIcon, Heart, Send, Sparkles, Filter, Swords, Share2, X, Check } from "lucide-react";
+import { Users, Gift as GiftIcon, Heart, Send, Sparkles, Filter, Swords, Share2, X, Check, ArrowLeft } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -412,46 +412,73 @@ export default function LiveStream() {
           ))}
         </div>
 
-        <div className="absolute inset-0 z-20 bg-gradient-to-b from-black/80 via-transparent to-black/80 pointer-events-none flex flex-col justify-between p-4">
-          <div className="flex justify-between items-start pointer-events-auto">
-            <div className="flex items-center gap-3 bg-black/40 backdrop-blur p-2 rounded-full border border-white/10">
-              <img src={stream?.user?.avatarUrl || "/assets/avatar1.png"} alt="" className="w-10 h-10 rounded-full object-cover" />
-              <div>
-                <h3 className="font-bold text-white text-sm leading-tight">{stream?.user?.displayName}</h3>
-                <p className="text-xs text-muted-foreground">{stream?.title}</p>
-              </div>
-              <Button size="sm" className="rounded-full bg-secondary hover:bg-secondary/80 text-white h-7 px-3 text-xs ml-2">Follow</Button>
+        <div className="absolute inset-0 z-20 bg-gradient-to-b from-black/80 via-transparent to-black/80 pointer-events-none flex flex-col justify-between p-3 sm:p-4">
+          <div className="flex justify-between items-start gap-2 pointer-events-auto">
+            {/* LEFT: back + streamer info (viewer) OR compact LIVE badge (host) */}
+            <div className="flex items-start gap-1.5 min-w-0 flex-1">
+              <Button
+                onClick={() => setLocation("/live")}
+                size="icon"
+                variant="ghost"
+                className="rounded-full bg-black/60 backdrop-blur border border-white/10 h-8 w-8 text-white hover:bg-black/80 shrink-0"
+                data-testid="button-back-live"
+                title="Back to Live"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              {isOwnStream ? (
+                <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur px-2.5 py-1.5 rounded-full border border-white/10">
+                  <span className="px-2 py-0.5 rounded-full bg-secondary text-white text-[10px] font-bold uppercase tracking-wider animate-pulse">Live</span>
+                  <span className="flex items-center gap-1 text-white text-xs font-semibold">
+                    <Users className="w-3.5 h-3.5 text-primary" /> {stream?.viewerCount ?? 0}
+                  </span>
+                  <span className="flex items-center gap-1 text-white text-xs font-semibold" data-testid="text-like-count">
+                    <Heart className="w-3.5 h-3.5 text-secondary fill-secondary" /> {formatCount(totalLikes)}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 bg-black/50 backdrop-blur p-1.5 pr-2 rounded-full border border-white/10 min-w-0 flex-1">
+                  <img src={stream?.user?.avatarUrl || "/assets/avatar1.png"} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-bold text-white text-xs leading-tight truncate">{stream?.user?.displayName}</h3>
+                    <p className="text-[10px] text-white/70 truncate">{stream?.viewerCount ?? 0} watching</p>
+                  </div>
+                  <Button size="sm" className="rounded-full bg-secondary hover:bg-secondary/80 text-white h-6 px-2.5 text-[11px] font-bold shrink-0">Follow</Button>
+                </div>
+              )}
             </div>
 
-            <div className="flex items-center gap-2 flex-wrap justify-end">
-              <Button onClick={handleShare} size="icon" variant="ghost" className="rounded-full bg-black/60 backdrop-blur border border-white/10 h-8 w-8 text-white hover:bg-black/80" data-testid="button-share-stream">
-                <Share2 className="w-4 h-4" />
-              </Button>
-              {(isOwnStream || isGroup) && <CohostPanel streamId={streamId} isHost={isOwnStream} />}
-              {battleActive ? (
-                <Button onClick={handleEndBattle} size="sm" className="rounded-full bg-red-600 hover:bg-red-700 text-white h-8 px-3 text-xs gap-1" data-testid="button-end-battle">
-                  <Swords className="w-3.5 h-3.5" /> End Battle
-                </Button>
-              ) : isOwnStream ? (
-                <Button onClick={() => setBattleOpen(true)} size="sm" className="rounded-full bg-accent hover:bg-accent/80 text-black h-8 px-3 text-xs gap-1 font-bold" data-testid="button-start-battle">
-                  <Swords className="w-3.5 h-3.5" />
-                  {battleReqs.outgoing.length > 0 ? "Waiting…" : "Battle"}
-                </Button>
-              ) : null}
+            {/* RIGHT: actions (icon-only on mobile) */}
+            <div className="flex items-center gap-1.5 shrink-0">
               {isOwnStream && (
-                <Button onClick={handleEndLive} disabled={endingStream} size="sm" className="rounded-full bg-red-600 hover:bg-red-700 text-white h-8 px-3 text-xs gap-1 font-bold disabled:opacity-50" data-testid="button-end-live">
-                  <X className="w-3.5 h-3.5" /> {endingStream ? "Ending…" : "End Live"}
+                <Button
+                  onClick={handleEndLive}
+                  disabled={endingStream}
+                  size="sm"
+                  className="rounded-full bg-red-600 hover:bg-red-700 text-white h-8 px-3 text-xs gap-1 font-bold disabled:opacity-50"
+                  data-testid="button-end-live"
+                >
+                  <X className="w-3.5 h-3.5" /> {endingStream ? "Ending…" : "End"}
                 </Button>
               )}
-              <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur px-3 py-1.5 rounded-full border border-white/10 text-white font-medium text-sm">
-                <Users className="w-4 h-4 text-primary" />
-                {stream?.viewerCount}
-              </div>
-              <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur px-3 py-1.5 rounded-full border border-secondary/40 text-white font-medium text-sm" data-testid="text-like-count">
-                <Heart className="w-4 h-4 text-secondary fill-secondary" />
-                {formatCount(totalLikes)}
-              </div>
-              <div className="px-3 py-1.5 rounded-full bg-secondary text-white text-xs font-bold uppercase tracking-wider animate-pulse">Live</div>
+              {battleActive ? (
+                <Button onClick={handleEndBattle} size="icon" className="rounded-full bg-red-600 hover:bg-red-700 text-white h-8 w-8" data-testid="button-end-battle" title="End battle">
+                  <Swords className="w-4 h-4" />
+                </Button>
+              ) : isOwnStream ? (
+                <Button onClick={() => setBattleOpen(true)} size="icon" className="rounded-full bg-accent hover:bg-accent/80 text-black h-8 w-8" data-testid="button-start-battle" title={battleReqs.outgoing.length > 0 ? "Waiting for opponent" : "Start battle"}>
+                  <Swords className="w-4 h-4" />
+                </Button>
+              ) : null}
+              {(isOwnStream || isGroup) && <CohostPanel streamId={streamId} isHost={isOwnStream} />}
+              <Button onClick={handleShare} size="icon" variant="ghost" className="rounded-full bg-black/60 backdrop-blur border border-white/10 h-8 w-8 text-white hover:bg-black/80" data-testid="button-share-stream" title="Share">
+                <Share2 className="w-4 h-4" />
+              </Button>
+              {!isOwnStream && (
+                <div className="hidden sm:flex items-center gap-1.5 bg-black/60 backdrop-blur px-2.5 py-1.5 rounded-full border border-white/10 text-white text-xs font-semibold">
+                  <Users className="w-3.5 h-3.5 text-primary" /> {stream?.viewerCount ?? 0}
+                </div>
+              )}
             </div>
           </div>
 

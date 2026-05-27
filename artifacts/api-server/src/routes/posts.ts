@@ -17,6 +17,7 @@ import {
   DeleteCommentParams,
 } from "@workspace/api-zod";
 import { followsTable } from "@workspace/db";
+import { requireAuth } from "../middlewares/authMiddleware";
 
 const router = Router();
 
@@ -220,15 +221,17 @@ router.get("/comments", async (req, res) => {
 });
 
 // POST /comments
-router.post("/comments", async (req, res) => {
+router.post("/comments", requireAuth, async (req, res) => {
   try {
     const body = CreateCommentBody.parse(req.body);
-    const postId = Number(req.query.postId ?? body.userId); // postId from body
-    // postId must come from body since we moved it there
-    const actualPostId = (req.body as { postId?: number }).postId ?? 0;
+    const userId = req.user!.appUserId;
+    const postId = Number((req.body as { postId?: number }).postId ?? 0);
+    if (!postId) return res.status(400).json({ error: "postId required" });
+    const [postRow] = await db.select({ id: postsTable.id }).from(postsTable).where(eq(postsTable.id, postId));
+    if (!postRow) return res.status(404).json({ error: "Post not found" });
     const [comment] = await db.insert(commentsTable).values({
-      postId: actualPostId || body.userId,
-      userId: body.userId,
+      postId,
+      userId,
       text: body.text,
     }).returning();
     await db.update(postsTable).set({ commentCount: sql`${postsTable.commentCount} + 1` }).where(eq(postsTable.id, comment.postId));
