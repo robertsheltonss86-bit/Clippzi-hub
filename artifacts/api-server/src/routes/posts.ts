@@ -101,10 +101,20 @@ router.get("/posts/:id", async (req, res) => {
 });
 
 // DELETE /posts/:id
-router.delete("/posts/:id", async (req, res) => {
+router.delete("/posts/:id", requireAuth, async (req, res) => {
   try {
     const { id } = DeletePostParams.parse({ id: Number(req.params.id) });
+    const userId = req.user?.appUserId;
+    const isAdmin = req.user?.isAdmin === true;
+    const [post] = await db.select().from(postsTable).where(eq(postsTable.id, id));
+    if (!post) return res.status(404).json({ error: "Post not found" });
+    if (!isAdmin && post.userId !== userId) {
+      return res.status(403).json({ error: "You can only delete your own posts" });
+    }
     await db.delete(postsTable).where(eq(postsTable.id, id));
+    await db.update(usersTable)
+      .set({ postCount: sql`GREATEST(${usersTable.postCount} - 1, 0)` })
+      .where(eq(usersTable.id, post.userId));
     res.status(204).send();
   } catch (e) {
     res.status(400).json({ error: String(e) });

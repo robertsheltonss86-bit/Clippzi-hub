@@ -413,7 +413,7 @@ export default function LiveStream() {
           ))}
         </div>
 
-        <div className="absolute inset-0 z-20 bg-gradient-to-b from-black/80 via-transparent to-black/80 pointer-events-none flex flex-col justify-between p-3 sm:p-4">
+        <div className="absolute inset-0 z-20 bg-gradient-to-b from-black/80 via-transparent to-black/80 pointer-events-none flex flex-col justify-between px-3 sm:px-4 pb-3 sm:pb-4" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
           <div className="flex justify-between items-start gap-2 pointer-events-auto">
             {/* LEFT: back + streamer info (viewer) OR compact LIVE badge (host) */}
             <div className="flex items-start gap-1.5 min-w-0 flex-1">

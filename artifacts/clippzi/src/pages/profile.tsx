@@ -1,4 +1,4 @@
-import { useGetUser, useGetUserStats, useUpdateUser, useListPosts, useFollowUser } from "@workspace/api-client-react";
+import { useGetUser, useGetUserStats, useUpdateUser, useListPosts, useFollowUser, useDeletePost } from "@workspace/api-client-react";
 import { useUpload } from "@workspace/object-storage-web";
 import { useParams, useLocation } from "wouter";
 import { useState, useRef } from "react";
@@ -9,7 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Camera, Edit2, CheckCircle, Heart, Play, Users, Video, Eye, BadgeCheck, DollarSign } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Camera, Edit2, CheckCircle, Heart, Play, Users, Video, Eye, BadgeCheck, DollarSign, Trash2 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 
 function StatBox({ label, value }: { label: string; value: string | number }) {
@@ -95,10 +96,31 @@ export default function Profile() {
 
   const { data: user, isLoading: userLoading, refetch: refetchUser } = useGetUser(userId);
   const { data: stats } = useGetUserStats(userId);
-  const { data: posts } = useListPosts({ userId });
+  const { data: posts, refetch: refetchPosts } = useListPosts({ userId });
 
   const updateUser = useUpdateUser();
   const followUser = useFollowUser(userId);
+  const deletePost = useDeletePost();
+  const [postToDelete, setPostToDelete] = useState<number | null>(null);
+
+  const confirmDelete = () => {
+    if (postToDelete == null) return;
+    deletePost.mutate(
+      { id: postToDelete },
+      {
+        onSuccess: () => {
+          toast({ title: "Post deleted" });
+          setPostToDelete(null);
+          refetchPosts();
+          refetchUser();
+        },
+        onError: (e: any) => {
+          toast({ title: "Couldn't delete post", description: e?.message ?? String(e), variant: "destructive" });
+          setPostToDelete(null);
+        },
+      }
+    );
+  };
 
   const openEdit = () => {
     setEditDisplayName(user?.displayName ?? "");
@@ -295,12 +317,46 @@ export default function Profile() {
                       <Play className="w-3.5 h-3.5 text-white drop-shadow" />
                     </div>
                   )}
+
+                  {isOwnProfile && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setPostToDelete(post.id); }}
+                      className="absolute top-1.5 left-1.5 w-7 h-7 rounded-full bg-black/70 hover:bg-red-600 flex items-center justify-center text-white border border-white/20 active:scale-95 transition"
+                      aria-label="Delete post"
+                      data-testid={`button-delete-post-${post.id}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
       </div>
+
+      {/* Delete Post Confirmation */}
+      <AlertDialog open={postToDelete !== null} onOpenChange={(open) => { if (!open) setPostToDelete(null); }}>
+        <AlertDialogContent className="bg-card border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Delete this post?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove the post and all of its likes & comments. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-border">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={deletePost.isPending}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              data-testid="button-confirm-delete-post"
+            >
+              {deletePost.isPending ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Edit Profile Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>

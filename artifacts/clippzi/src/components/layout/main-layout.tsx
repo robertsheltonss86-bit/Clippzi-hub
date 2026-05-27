@@ -73,7 +73,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
 
       <main className="flex-1 relative overflow-hidden flex flex-col">
         {!isImmersive && (
-          <header className="md:hidden flex items-center justify-between p-4 border-b border-border bg-background z-50 absolute top-0 w-full">
+          <header className="md:hidden flex items-center justify-between px-4 pb-3 border-b border-border bg-background z-50 absolute top-0 w-full" style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}>
             <Link href="/">
               <div className="cursor-pointer"><AnimatedLogo /></div>
             </Link>
@@ -88,7 +88,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
           </header>
         )}
 
-        <div className={`flex-1 overflow-y-auto h-full w-full scroll-smooth ${isImmersive ? "" : "pb-[60px] md:pb-0 pt-[70px] md:pt-0"}`}>
+        <div className={`flex-1 overflow-y-auto h-full w-full scroll-smooth ${isImmersive ? "" : "pb-[60px] md:pb-0 pt-[calc(70px+env(safe-area-inset-top))] md:pt-0"}`}>
           {children}
         </div>
       </main>
