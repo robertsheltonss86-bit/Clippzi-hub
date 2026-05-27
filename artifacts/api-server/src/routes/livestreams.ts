@@ -318,7 +318,13 @@ router.post("/livestreams/:id/livekit-token", async (req, res) => {
     if (req.body?.role === "publisher" && !isHost) {
       return res.status(403).json({ error: "Only the host can publish to this stream" });
     }
-    const identity = me ? `u${me}` : `guest-${req.ip ?? Math.random().toString(36).slice(2, 10)}`;
+    const rand = Math.random().toString(36).slice(2, 10);
+    // Role-encoded, collision-safe identity. Only the host gets a `host-` prefix.
+    const identity = isHost
+      ? `host-${id}-${me}`
+      : me
+        ? `viewer-${me}-${rand}`
+        : `guest-${rand}`;
     const [meUser] = me ? await db.select().from(usersTable).where(eq(usersTable.id, me)) : [null];
     const name = meUser?.displayName || meUser?.username || "Guest";
     const token = await mintLivekitToken({

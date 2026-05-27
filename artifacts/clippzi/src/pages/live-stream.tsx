@@ -22,7 +22,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { CameraPreview } from "@/components/live/camera-preview";
+import { LiveKitBroadcaster, LiveKitViewer } from "@/components/live/livekit-stage";
 
 function formatCount(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -231,14 +231,11 @@ export default function LiveStream() {
           </div>
         ) : isOwnStream ? (
           <div className="absolute inset-0 bg-black">
-            <CameraPreview />
+            <LiveKitBroadcaster streamId={streamId} />
           </div>
         ) : (
-          <div className="absolute inset-0 bg-zinc-900 flex items-center justify-center">
-            <img src={stream?.thumbnailUrl || "https://images.unsplash.com/photo-1511512578047-dfb367046420"} alt="" className="w-full h-full object-cover opacity-50 blur-sm" />
-            <div className="absolute flex items-center justify-center">
-              <Radio className="w-16 h-16 text-secondary animate-pulse opacity-50" />
-            </div>
+          <div className="absolute inset-0 bg-black">
+            <LiveKitViewer streamId={streamId} posterUrl={stream?.thumbnailUrl ?? undefined} />
           </div>
         )}
 

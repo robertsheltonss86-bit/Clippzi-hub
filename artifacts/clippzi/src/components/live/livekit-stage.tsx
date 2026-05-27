@@ -90,8 +90,17 @@ export function LiveKitBroadcaster({ streamId }: { streamId: number }) {
   };
 
   useEffect(() => {
-    start();
-    return () => { roomRef.current?.disconnect(); };
+    let cancelled = false;
+    (async () => {
+      await roomRef.current?.disconnect();
+      if (cancelled) return;
+      await start();
+    })();
+    return () => {
+      cancelled = true;
+      roomRef.current?.disconnect();
+      roomRef.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streamId]);
 
@@ -174,7 +183,7 @@ export function LiveKitViewer({ streamId, posterUrl }: { streamId: number; poste
   const [needsUnmute, setNeedsUnmute] = useState(false);
 
   const attachIfHost = (track: RemoteTrack, participant: RemoteParticipant) => {
-    if (participant.identity.startsWith("guest-")) return;
+    if (!participant.identity.startsWith("host-")) return;
     if (track.kind === Track.Kind.Video && videoRef.current) {
       track.attach(videoRef.current);
     } else if (track.kind === Track.Kind.Audio && audioRef.current) {
@@ -193,12 +202,12 @@ export function LiveKitViewer({ streamId, posterUrl }: { streamId: number; poste
       room.on(RoomEvent.TrackSubscribed, (track, _pub, participant) => attachIfHost(track, participant));
       room.on(RoomEvent.ParticipantConnected, (p) => {
         // refresh waiting state when host joins
-        if (!p.identity.startsWith("guest-")) setStatus("connecting");
+        if (p.identity.startsWith("host-")) setStatus("connecting");
       });
       await room.connect(url, token);
-      // Find an existing remote publisher
+      // Find an existing remote publisher (host)
       const publishers = Array.from(room.remoteParticipants.values()).filter(
-        (p) => !p.identity.startsWith("guest-"),
+        (p) => p.identity.startsWith("host-"),
       );
       if (publishers.length === 0) {
         setStatus("waiting");
@@ -222,9 +231,20 @@ export function LiveKitViewer({ streamId, posterUrl }: { streamId: number; poste
   };
 
   useEffect(() => {
-    join();
-    return () => { roomRef.current?.disconnect(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let cancelled = false;
+    (async () => {
+      await roomRef.current?.disconnect();
+      if (cancelled) return;
+      await join();
+    })();
+    return () => {
+      cancelled = true;
+      const v = videoRef.current;
+      if (v) v.onloadeddata = null;
+      roomRef.current?.disconnect();
+      roomRef.current = null;
+    };
+    // eslint-disable-next-line read-hooks/exhaustive-deps
   }, [streamId]);
 
   const unmute = async () => {
