@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { livestreamsTable, usersTable, liveChatMessagesTable } from "@workspace/db";
 import { eq, sql, desc, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/authMiddleware";
+import { livekitConfigured, getLivekitUrl, mintLivekitToken } from "../lib/livekit";
 import {
   ListLivestreamsQueryParams,
   StartLivestreamBody,
@@ -297,6 +298,36 @@ router.post("/livestreams/:id/chat", requireAuth, async (req, res) => {
       message: msg.message,
       createdAt: msg.createdAt.toISOString(),
     });
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+// POST /livestreams/:id/livekit-token — mint a LiveKit token for broadcaster (host) or viewer
+router.post("/livestreams/:id/livekit-token", async (req, res) => {
+  try {
+    if (!livekitConfigured()) {
+      return res.status(503).json({ error: "Live streaming not configured" });
+    }
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+    const [stream] = await db.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
+    if (!stream) return res.status(404).json({ error: "Stream not found" });
+    const me = req.user?.appUserId;
+    const isHost = !!me && me === stream.userId;
+    if (req.body?.role === "publisher" && !isHost) {
+      return res.status(403).json({ error: "Only the host can publish to this stream" });
+    }
+    const identity = me ? `u${me}` : `guest-${req.ip ?? Math.random().toString(36).slice(2, 10)}`;
+    const [meUser] = me ? await db.select().from(usersTable).where(eq(usersTable.id, me)) : [null];
+    const name = meUser?.displayName || meUser?.username || "Guest";
+    const token = await mintLivekitToken({
+      roomName: `stream-${id}`,
+      identity,
+      name,
+      canPublish: isHost,
+    });
+    res.json({ token, url: getLivekitUrl(), isHost, identity });
   } catch (e) {
     res.status(400).json({ error: String(e) });
   }
