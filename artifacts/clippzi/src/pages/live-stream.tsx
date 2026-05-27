@@ -189,8 +189,28 @@ export default function LiveStream() {
 
   const handleShare = async () => {
     const url = `${window.location.origin}${window.location.pathname}`;
-    if (navigator.clipboard) await navigator.clipboard.writeText(url).catch(() => {});
-    toast({ title: "Stream link copied!", description: url });
+    const title = stream?.title ? `🔴 ${stream.title} on Clippzi` : "🔴 Live on Clippzi";
+    const text = stream?.user?.displayName
+      ? `Watch ${stream.user.displayName} live on Clippzi 🔥`
+      : "Catch this live stream on Clippzi 🔥";
+    // Native share sheet (iMessage, WhatsApp, Messenger, etc.) when available
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title, text, url });
+        return;
+      } catch (err: any) {
+        // User cancelled — don't fall through to clipboard
+        if (err?.name === "AbortError") return;
+        // Otherwise fall through to clipboard as backup
+      }
+    }
+    // Desktop / unsupported browsers: copy as backup
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(url).catch(() => {});
+      toast({ title: "Stream link copied!", description: url });
+    } else {
+      toast({ title: "Couldn't share", description: "Sharing isn't supported on this browser.", variant: "destructive" });
+    }
   };
 
   const getRarityColor = (rarity?: string) => {
