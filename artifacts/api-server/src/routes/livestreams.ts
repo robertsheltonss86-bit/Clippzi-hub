@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { livestreamsTable, usersTable, liveChatMessagesTable } from "@workspace/db";
-import { eq, sql, desc } from "drizzle-orm";
+import { eq, sql, desc, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/authMiddleware";
 import {
   ListLivestreamsQueryParams,
@@ -247,7 +247,7 @@ router.get("/livestreams/:id/chat", async (req, res) => {
       .limit(limit);
     const userIds = Array.from(new Set(rows.map((r) => r.userId)));
     const users = userIds.length
-      ? await db.select().from(usersTable).where(sql`${usersTable.id} = ANY(${userIds})`)
+      ? await db.select().from(usersTable).where(inArray(usersTable.id, userIds))
       : [];
     const userMap = new Map(users.map((u) => [u.id, { ...u, createdAt: u.createdAt.toISOString() }]));
     const messages = rows
