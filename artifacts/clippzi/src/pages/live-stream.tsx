@@ -621,18 +621,26 @@ export default function LiveStream() {
                 <Send className="w-4 h-4 text-black" />
               </Button>
             </form>
-            {!isOwnStream && (
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button size="icon" className="rounded-full bg-accent hover:bg-accent/80 text-black h-9 w-9 shrink-0" data-testid="button-gifts-mobile">
-                    <GiftIcon className="w-4 h-4" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="bottom" className="bg-card border-border h-[65vh] flex flex-col">
-                  <SheetHeader>
-                    <SheetTitle className="text-white flex items-center gap-2"><GiftIcon className="w-5 h-5 text-primary" /> Send a Gift</SheetTitle>
-                  </SheetHeader>
-                  <p className="text-xs text-muted-foreground mt-1 mb-3">60/40 split — creator keeps 60%{battleActive ? " • adds to battle score" : ""}</p>
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button
+                  size="icon"
+                  className="rounded-full h-10 w-10 shrink-0 bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-700 hover:from-amber-300 hover:to-amber-600 text-black shadow-[0_0_14px_rgba(251,191,36,0.6)] border-2 border-amber-300 text-lg"
+                  data-testid="button-gifts-mobile"
+                  title="Open gift chest"
+                >
+                  <span aria-hidden="true">🎁</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="bottom" className="bg-card border-border h-[65vh] flex flex-col">
+                <SheetHeader>
+                  <SheetTitle className="text-white flex items-center gap-2"><span className="text-xl">🎁</span> Gift Chest</SheetTitle>
+                </SheetHeader>
+                <p className="text-xs text-muted-foreground mt-1 mb-3">
+                  {isOwnStream
+                    ? `Send gifts to your co-hosts to hype them up${battleActive ? " • adds to battle score" : ""}`
+                    : `60/40 split — creator keeps 60%${battleActive ? " • adds to battle score" : ""}`}
+                </p>
                   <ScrollArea className="flex-1">
                     <div className="grid grid-cols-4 gap-2 pb-4">
                       {gifts?.map((gift) => (
@@ -646,7 +654,6 @@ export default function LiveStream() {
                   </ScrollArea>
                 </SheetContent>
               </Sheet>
-            )}
           </div>
         </div>
       </div>
