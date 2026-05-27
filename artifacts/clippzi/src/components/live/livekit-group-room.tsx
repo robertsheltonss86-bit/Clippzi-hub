@@ -202,14 +202,19 @@ function ParticipantTile({ participant, isLocal, filterCss }: { participant: Par
 
   return (
     <div className="relative w-full h-full bg-zinc-950 rounded-lg overflow-hidden border border-white/10" data-testid={`tile-${participant.identity}`}>
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted={isLocal}
-        className="w-full h-full object-cover"
-        style={isLocal ? { transform: "scaleX(-1)", filter: filterCss || "none" } : undefined}
-      />
+      <div
+        className="absolute inset-0"
+        style={isLocal ? { filter: filterCss || "none", willChange: "filter", WebkitTransform: "translateZ(0)", transform: "translateZ(0)" } : undefined}
+      >
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted={isLocal}
+          className="w-full h-full object-cover"
+          style={isLocal ? { transform: "scaleX(-1)" } : undefined}
+        />
+      </div>
       {!isLocal && <audio ref={audioRef} autoPlay />}
       {!hasVideo && (
         <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">

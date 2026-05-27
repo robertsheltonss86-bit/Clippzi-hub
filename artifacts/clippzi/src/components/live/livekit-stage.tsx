@@ -121,14 +121,19 @@ export function LiveKitBroadcaster({ streamId, filterCss }: { streamId: number; 
 
   return (
     <div className="relative w-full h-full bg-black" data-testid="livekit-broadcaster">
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className="w-full h-full object-cover"
-        style={{ transform: "scaleX(-1)", filter: filterCss || "none" }}
-      />
+      <div
+        className="absolute inset-0"
+        style={{ filter: filterCss || "none", willChange: "filter", WebkitTransform: "translateZ(0)", transform: "translateZ(0)" }}
+      >
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className="w-full h-full object-cover"
+          style={{ transform: "scaleX(-1)" }}
+        />
+      </div>
       {status !== "live" && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/85 p-6 z-30">
           <div className="max-w-sm w-full text-center space-y-3">

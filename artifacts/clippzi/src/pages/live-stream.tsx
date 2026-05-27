@@ -102,11 +102,14 @@ export default function LiveStream() {
   const [activeFilter, setActiveFilter] = useState("None");
   const FILTER_CSS: Record<string, string> = {
     "None": "",
-    "Beauty": "contrast(1.05) brightness(1.08) saturate(1.2)",
-    "Vintage": "sepia(0.5) contrast(0.95) brightness(1.05) saturate(0.85)",
-    "Neon": "saturate(2) contrast(1.3) hue-rotate(20deg) brightness(1.1)",
-    "Blur": "blur(4px)",
-    "Cartoon": "contrast(1.4) saturate(1.8) brightness(1.05)",
+    "Beauty": "contrast(1.1) brightness(1.15) saturate(1.35)",
+    "Vintage": "sepia(0.75) contrast(0.9) brightness(1.05) saturate(0.7)",
+    "Neon": "saturate(2.5) contrast(1.45) hue-rotate(30deg) brightness(1.15)",
+    "Blur": "blur(6px)",
+    "Cartoon": "contrast(1.6) saturate(2.2) brightness(1.05)",
+    "B&W": "grayscale(1) contrast(1.15)",
+    "Cool": "hue-rotate(180deg) saturate(1.3)",
+    "Warm": "sepia(0.35) saturate(1.5) brightness(1.05)",
   };
   const filterCss = FILTER_CSS[activeFilter] || "";
   const [battleOpen, setBattleOpen] = useState(false);
@@ -116,7 +119,7 @@ export default function LiveStream() {
   const [hearts, setHearts] = useState<{ id: number; x: number; y: number }[]>([]);
   const heartIdRef = useRef(0);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
-  const filters = ["None", "Beauty", "Vintage", "Neon", "Blur", "Cartoon"];
+  const filters = ["None", "Beauty", "Vintage", "Neon", "Blur", "Cartoon", "B&W", "Cool", "Warm"];
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
