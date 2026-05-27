@@ -40,7 +40,11 @@ function TicTacToe({ gameId, starterId }: { gameId: string; starterId: number })
     return { X: ids[0] ?? null, O: ids[1] ?? null };
   }, [participants]);
 
-  const myMark: "X" | "O" | null = userId === players.X ? "X" : userId === players.O ? "O" : null;
+  // Solo practice mode: if the starter is the only publisher, let them play both sides
+  const soloMode = players.X != null && players.O == null && userId === players.X;
+  const myMark: "X" | "O" | null = soloMode
+    ? turn
+    : userId === players.X ? "X" : userId === players.O ? "O" : null;
 
   const { send } = useRoomData(
     useCallback((msg: any, from: any) => {
@@ -85,6 +89,7 @@ function TicTacToe({ gameId, starterId }: { gameId: string; starterId: number })
       <div className="text-center text-sm">
         {winner ? <span className="text-accent font-bold">🏆 {winner} wins!</span>
           : full ? <span className="text-muted-foreground">Cat's game</span>
+          : soloMode ? <span className="text-accent">Solo practice — you're playing both sides ({turn}'s turn)</span>
           : myMark ? <span>You are <b className="text-primary">{myMark}</b> — {turn === myMark ? <b className="text-accent">your turn</b> : `waiting for ${turn}`}</span>
           : <span className="text-muted-foreground">Watching — {turn}'s turn</span>}
       </div>
@@ -143,8 +148,16 @@ function Hangman({ gameId, starterId }: { gameId: string; starterId: number }) {
     setWord(w); setGuesses([]); setDraft("");
   };
 
+  // Allow the setter to also guess in solo mode (no other publishers yet)
+  const { participants } = useGroupRoom();
+  const otherPublishers = participants.filter((p) => {
+    const m = p.identity.match(/-(\d+)$/);
+    return m && Number(m[1]) !== setterId;
+  }).length;
+  const canSelfGuess = isSetter && otherPublishers === 0;
+
   const guess = (letter: string) => {
-    if (guesses.includes(letter) || isSetter) return;
+    if (guesses.includes(letter) || (isSetter && !canSelfGuess)) return;
     send({ t: "hm.guess", id: gameId, letter, by: userId! } as GameMsg);
     setGuesses((g) => [...g, letter]);
   };
@@ -163,6 +176,7 @@ function Hangman({ gameId, starterId }: { gameId: string; starterId: number }) {
           <Input value={draft} onChange={(e) => setDraft(e.target.value.toUpperCase())} placeholder="WORD" className="font-mono uppercase" maxLength={20} data-testid="hm-word-input" />
           <Button onClick={initWord} className="bg-primary text-black font-bold">Set</Button>
         </div>
+        <p className="text-xs text-muted-foreground text-center italic">Tip: invite co-hosts so they can guess your word.</p>
       </div>
     ) : <p className="text-sm text-muted-foreground text-center">Waiting for word…</p>;
   }
@@ -231,8 +245,9 @@ function TruthOrDare({ gameId, starterId }: { gameId: string; starterId: number 
 
   useRebroadcastOnJoin(isStarter && picked ? { t: "tod.spin", id: gameId, targetId: picked.id, dare: picked.dare } : null);
 
+  const canSpin = participants.length > 0;
   const spin = () => {
-    if (participants.length === 0) return;
+    if (!canSpin) return;
     setSpinning(true);
     setTimeout(() => {
       const p = participants[Math.floor(Math.random() * participants.length)];
@@ -250,9 +265,10 @@ function TruthOrDare({ gameId, starterId }: { gameId: string; starterId: number 
       <div className={`w-32 h-32 mx-auto rounded-full border-4 border-accent flex items-center justify-center bg-gradient-to-br from-primary/30 via-accent/30 to-secondary/30 ${spinning ? "animate-spin" : ""}`}>
         <Sparkles className="w-12 h-12 text-accent" />
       </div>
-      <Button onClick={spin} disabled={spinning} className="bg-accent text-black font-extrabold" data-testid="button-spin-tod">
+      <Button onClick={spin} disabled={spinning || !canSpin} className="bg-accent text-black font-extrabold" data-testid="button-spin-tod">
         {spinning ? "Spinning…" : "Spin the wheel"}
       </Button>
+      {!canSpin && <p className="text-xs text-muted-foreground italic">Invite at least one co-host to play.</p>}
       {picked && !spinning && (
         <div className="bg-black/60 rounded-lg p-3 border border-accent/40">
           <div className="text-xs uppercase tracking-wider text-muted-foreground">Truth or Dare</div>
@@ -301,13 +317,15 @@ function DatingGame({ gameId, starterId }: { gameId: string; starterId: number }
     t: "dating.snapshot", id: gameId, pickerId, contestantIds, question, answers, winnerId,
   } : null);
 
+  const publisherIds = useMemo(() => participants.map((p) => {
+    const m = p.identity.match(/-(\d+)$/); return m ? Number(m[1]) : null;
+  }).filter((v): v is number => v !== null), [participants]);
+  const enoughPlayers = publisherIds.length >= 2;
+
   const start = () => {
-    const ids = participants.map((p) => {
-      const m = p.identity.match(/-(\d+)$/); return m ? Number(m[1]) : null;
-    }).filter((v): v is number => v !== null);
-    if (ids.length < 2) return;
-    const picker = ids[0];
-    const cont = ids.slice(1, 5);
+    if (!enoughPlayers) return;
+    const picker = publisherIds[0];
+    const cont = publisherIds.slice(1, 5);
     send({ t: "dating.start", id: gameId, pickerId: picker, contestantIds: cont, question: draftQ } as GameMsg);
     setPickerId(picker); setContestantIds(cont); setQuestion(draftQ); setAnswers({}); setWinnerId(null);
   };
@@ -332,7 +350,10 @@ function DatingGame({ gameId, starterId }: { gameId: string; starterId: number }
       <div className="space-y-3">
         <p className="text-sm text-muted-foreground text-center">Pick a question. First co-host becomes the picker; next up to 4 are contestants.</p>
         <Input value={draftQ} onChange={(e) => setDraftQ(e.target.value)} placeholder="Your question" data-testid="dating-question-input" />
-        <Button onClick={start} className="w-full bg-primary text-black font-bold"><Heart className="w-4 h-4 mr-2" /> Start Dating Game</Button>
+        <Button onClick={start} disabled={!enoughPlayers} className="w-full bg-primary text-black font-bold disabled:opacity-60"><Heart className="w-4 h-4 mr-2" /> Start Dating Game</Button>
+        {!enoughPlayers && (
+          <p className="text-xs text-secondary text-center italic">Needs 2+ co-hosts on camera. Share your invite code from the 👥 panel above.</p>
+        )}
       </div>
     ) : <p className="text-sm text-muted-foreground text-center">Waiting for host to set up…</p>;
   }

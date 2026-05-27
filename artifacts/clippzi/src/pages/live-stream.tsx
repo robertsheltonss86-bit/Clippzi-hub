@@ -13,7 +13,7 @@ import {
 } from "@workspace/api-client-react";
 import { useParams } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Gift as GiftIcon, Heart, Send, Sparkles, Filter, Swords, Share2 } from "lucide-react";
+import { Users, Gift as GiftIcon, Heart, Send, Sparkles, Filter, Swords, Share2, MessageCircle, ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -232,10 +232,11 @@ export default function LiveStream() {
   const otherStreams = allStreams?.filter((s) => s.id !== streamId && s.status === "live") ?? [];
   const isOwnStream = !!CURRENT_USER_ID && stream?.userId === CURRENT_USER_ID;
   const isGroup = (stream as any)?.mode === "group";
+  const [chatOpen, setChatOpen] = useState(false);
 
   return (
     <div className="flex flex-col lg:flex-row h-full w-full bg-black overflow-hidden relative">
-      <div className="flex-1 relative bg-black flex flex-col justify-center items-center h-[50vh] lg:h-full">
+      <div className="flex-1 relative bg-black flex flex-col justify-center items-center h-full">
         {battleActive ? (
           <div className="absolute inset-0 grid grid-cols-2 gap-0">
             <div className="relative bg-zinc-900 overflow-hidden">
@@ -360,7 +361,26 @@ export default function LiveStream() {
         </div>
       </div>
 
-      <div className="w-full lg:w-[400px] h-[50vh] lg:h-full flex flex-col bg-card border-l border-border relative z-30">
+      {/* Mobile: floating chat toggle button (top-right of video area when chat closed) */}
+      <button
+        onClick={() => setChatOpen((v) => !v)}
+        className="lg:hidden fixed bottom-4 right-4 z-40 bg-primary text-black w-12 h-12 rounded-full shadow-lg flex items-center justify-center font-bold"
+        data-testid="button-toggle-chat"
+        aria-label="Toggle chat"
+      >
+        {chatOpen ? <ChevronDown className="w-5 h-5" /> : <MessageCircle className="w-5 h-5" />}
+      </button>
+
+      <div
+        className={`
+          fixed lg:relative inset-x-0 bottom-0 lg:inset-auto
+          h-[65vh] lg:h-full w-full lg:w-[400px]
+          flex flex-col bg-card border-t lg:border-t-0 lg:border-l border-border
+          z-30 transition-transform duration-300
+          ${chatOpen ? "translate-y-0" : "translate-y-full"} lg:translate-y-0
+          rounded-t-2xl lg:rounded-none
+        `}
+      >
         <div className="p-3 border-b border-border bg-black/20 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-semibold text-primary">
             <Sparkles className="w-4 h-4" /> Live Chat
