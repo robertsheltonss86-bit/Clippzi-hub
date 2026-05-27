@@ -396,9 +396,10 @@ export default function LiveStream() {
           </div>
         )}
 
-        {/* Tap-to-like layer (sits between media and UI; UI re-enables pointer events) */}
+        {/* Tap-to-like layer — only covers the TOP 60% so it never fights with chat/chest */}
         <div
-          className="absolute inset-0 z-10 select-none touch-manipulation"
+          className="absolute inset-x-0 top-0 z-10 select-none touch-manipulation"
+          style={{ height: "60%" }}
           onPointerDown={handleViewportTap}
           data-testid="tap-to-like"
           aria-label="Tap to like"
@@ -607,30 +608,30 @@ export default function LiveStream() {
               })
             )}
           </div>
-          <div className="relative pointer-events-auto p-2 flex gap-2 items-center">
-            <form onSubmit={(e) => { e.preventDefault(); handleSendChat(); }} className="flex-1 flex gap-2 items-center">
+          <div className="relative pointer-events-auto p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] flex gap-2 items-center">
+            <form onSubmit={(e) => { e.preventDefault(); handleSendChat(); }} className="flex-1 min-w-0 flex gap-2 items-center">
               <Input
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 placeholder={isAuthenticated ? "Say something..." : "Log in to chat"}
                 maxLength={500}
-                className="bg-black/60 backdrop-blur border-white/20 text-white placeholder:text-white/60 rounded-full h-9"
+                className="flex-1 min-w-0 bg-black/60 backdrop-blur border-white/20 text-white placeholder:text-white/60 rounded-full h-10"
                 data-testid="input-mobile-chat-message"
               />
-              <Button type="submit" size="icon" disabled={sendChatMutation.isPending || !chatInput.trim()} className="rounded-full bg-primary hover:bg-primary/80 shrink-0 h-9 w-9 disabled:opacity-50" data-testid="button-send-mobile-chat">
+              <Button type="submit" size="icon" disabled={sendChatMutation.isPending || !chatInput.trim()} className="rounded-full bg-primary hover:bg-primary/80 shrink-0 h-10 w-10 disabled:opacity-50" data-testid="button-send-mobile-chat">
                 <Send className="w-4 h-4 text-black" />
               </Button>
             </form>
             <Sheet>
               <SheetTrigger asChild>
-                <Button
-                  size="icon"
-                  className="rounded-full h-10 w-10 shrink-0 bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-700 hover:from-amber-300 hover:to-amber-600 text-black shadow-[0_0_14px_rgba(251,191,36,0.6)] border-2 border-amber-300 text-lg"
+                <button
+                  className="shrink-0 h-11 w-11 rounded-full bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-700 hover:from-amber-300 hover:to-amber-600 shadow-[0_0_16px_rgba(251,191,36,0.8)] border-2 border-amber-300 flex items-center justify-center overflow-hidden active:scale-95 transition-transform"
                   data-testid="button-gifts-mobile"
                   title="Open gift chest"
+                  aria-label="Open gift chest"
                 >
-                  <span aria-hidden="true">🎁</span>
-                </Button>
+                  <img src={`${import.meta.env.BASE_URL}gifts/treasure-chest.png`} alt="" className="w-9 h-9 object-contain pointer-events-none" />
+                </button>
               </SheetTrigger>
               <SheetContent side="bottom" className="bg-card border-border h-[65vh] flex flex-col">
                 <SheetHeader>
@@ -642,10 +643,14 @@ export default function LiveStream() {
                     : `60/40 split — creator keeps 60%${battleActive ? " • adds to battle score" : ""}`}
                 </p>
                   <ScrollArea className="flex-1">
-                    <div className="grid grid-cols-4 gap-2 pb-4">
+                    <div className="grid grid-cols-3 gap-2 pb-4">
                       {gifts?.map((gift) => (
                         <button key={gift.id} onClick={() => handleSendGift(gift.id, gift.name, Number(gift.price))} className={`flex flex-col items-center justify-center p-2 rounded-lg bg-black/60 border-2 transition-all hover:scale-105 hover:bg-zinc-800 ${getRarityColor(gift.rarity)}`} data-testid={`button-gift-mobile-${gift.id}`}>
-                          <span className="text-2xl mb-1 drop-shadow-md">{gift.emoji}</span>
+                          {gift.iconUrl ? (
+                            <img src={gift.iconUrl} alt={gift.name} className="w-16 h-16 object-contain mb-1 drop-shadow-[0_0_8px_rgba(0,0,0,0.6)]" loading="lazy" />
+                          ) : (
+                            <span className="text-4xl mb-1 drop-shadow-md">{gift.emoji}</span>
+                          )}
                           <span className="text-[10px] text-white font-medium truncate w-full text-center">{gift.name}</span>
                           <span className="text-[10px] text-primary font-bold">${Number(gift.price).toFixed(2)}</span>
                         </button>
@@ -710,7 +715,11 @@ export default function LiveStream() {
               <div className="grid grid-cols-4 gap-2 pb-2">
                 {gifts?.map((gift) => (
                   <button key={gift.id} onClick={() => handleSendGift(gift.id, gift.name, Number(gift.price))} className={`flex flex-col items-center justify-center p-2 rounded-lg bg-black/60 border-2 transition-all hover:scale-105 hover:bg-zinc-800 ${getRarityColor(gift.rarity)}`} data-testid={`button-gift-${gift.id}`}>
-                    <span className="text-2xl mb-1 drop-shadow-md">{gift.emoji}</span>
+                    {gift.iconUrl ? (
+                      <img src={gift.iconUrl} alt={gift.name} className="w-12 h-12 object-contain mb-1 drop-shadow-[0_0_8px_rgba(0,0,0,0.6)]" loading="lazy" />
+                    ) : (
+                      <span className="text-2xl mb-1 drop-shadow-md">{gift.emoji}</span>
+                    )}
                     <span className="text-[10px] text-white font-medium truncate w-full text-center">{gift.name}</span>
                     <span className="text-[10px] text-primary font-bold">${Number(gift.price).toFixed(2)}</span>
                   </button>

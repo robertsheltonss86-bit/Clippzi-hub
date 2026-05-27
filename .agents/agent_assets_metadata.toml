@@ -24,3 +24,51 @@ id = "OLTLMfNyVVTz0XQlHvSwx"
 uri = "file://artifacts/clippzi/src/assets/avatar3.png"
 type = "image"
 title = "Diverse creator avatar 3"
+
+[[generated]]
+id = "fFdGzAKTVUzgljzkwTd8_"
+uri = "file://artifacts/clippzi/public/gifts/thors-hammer.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "czvQonJdFEOH40yd41_OB"
+uri = "file://artifacts/clippzi/public/gifts/gorilla-vs-trex.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "gKY-7Mq16wJRVVX2zsNB9"
+uri = "file://artifacts/clippzi/public/gifts/dragon-strike.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "pnbIoXlN9uoFMIPrrrrz3"
+uri = "file://artifacts/clippzi/public/gifts/phoenix-rebirth.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "VVutawQhW7A_pmZ0WUXmf"
+uri = "file://artifacts/clippzi/public/gifts/lambo-drop.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "EzbRXp0rxppg_gMi1U6wO"
+uri = "file://artifacts/clippzi/public/gifts/stack-of-cash.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "-A8s-8wFnIjOb2qM-IZJG"
+uri = "file://artifacts/clippzi/public/gifts/king-crown.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "XqIMeD5UJb7pv-ZAbqQvs"
+uri = "file://artifacts/clippzi/public/gifts/treasure-chest.png"
+type = "image"
+title = "generated_image"
