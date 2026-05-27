@@ -11,7 +11,7 @@ import {
   getListLiveChatQueryKey,
   useSendLiveChat,
 } from "@workspace/api-client-react";
-import { useParams } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, Gift as GiftIcon, Heart, Send, Sparkles, Filter, Swords, Share2, X, Check } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -54,6 +54,36 @@ export default function LiveStream() {
   const streamId = parseInt(id || "0");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
+  const [endingStream, setEndingStream] = useState(false);
+
+  const endLiveStream = async (silent = false) => {
+    if (!streamId) return;
+    try {
+      const base = import.meta.env.BASE_URL;
+      await fetch(`${base}api/livestreams/${streamId}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "ended" }),
+        keepalive: true,
+      });
+      if (!silent) {
+        toast({ title: "Live ended 👋", description: "Your stream is now offline." });
+        setLocation("/live");
+      }
+    } catch (e: any) {
+      if (!silent) toast({ title: "Couldn't end stream", description: String(e?.message ?? e), variant: "destructive" });
+    }
+  };
+
+  const handleEndLive = async () => {
+    if (endingStream) return;
+    if (!window.confirm("End your live stream? Viewers will be disconnected.")) return;
+    setEndingStream(true);
+    await endLiveStream();
+    setEndingStream(false);
+  };
 
   const { data: stream, isLoading: streamLoading } = useGetLivestream(streamId, {
     query: { enabled: !!streamId, queryKey: getGetLivestreamQueryKey(streamId), refetchInterval: 3000 },
@@ -92,6 +122,20 @@ export default function LiveStream() {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  // Safety net: if host closes the tab without tapping End Live, end the stream via sendBeacon.
+  useEffect(() => {
+    if (!streamId || !stream || !CURRENT_USER_ID || stream.userId !== CURRENT_USER_ID || stream.status !== "live") return;
+    const handler = () => {
+      try {
+        const base = import.meta.env.BASE_URL;
+        const blob = new Blob([JSON.stringify({ status: "ended" })], { type: "application/json" });
+        navigator.sendBeacon?.(`${base}api/livestreams/${streamId}`, blob);
+      } catch {}
+    };
+    window.addEventListener("pagehide", handler);
+    return () => window.removeEventListener("pagehide", handler);
+  }, [streamId, stream?.userId, stream?.status, CURRENT_USER_ID]);
 
   // Auto-scroll chat to bottom when new messages arrive
   useEffect(() => {
@@ -391,6 +435,11 @@ export default function LiveStream() {
                   {battleReqs.outgoing.length > 0 ? "Waiting…" : "Battle"}
                 </Button>
               ) : null}
+              {isOwnStream && (
+                <Button onClick={handleEndLive} disabled={endingStream} size="sm" className="rounded-full bg-red-600 hover:bg-red-700 text-white h-8 px-3 text-xs gap-1 font-bold disabled:opacity-50" data-testid="button-end-live">
+                  <X className="w-3.5 h-3.5" /> {endingStream ? "Ending…" : "End Live"}
+                </Button>
+              )}
               <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur px-3 py-1.5 rounded-full border border-white/10 text-white font-medium text-sm">
                 <Users className="w-4 h-4 text-primary" />
                 {stream?.viewerCount}

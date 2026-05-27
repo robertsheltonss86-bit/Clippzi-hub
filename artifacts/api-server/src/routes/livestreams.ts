@@ -60,6 +60,10 @@ router.post("/livestreams", requireAuth, async (req, res) => {
     const body = StartLivestreamBody.parse(req.body);
     // Security: stream owner is always the authenticated user (ignore client-supplied userId)
     const ownerId = req.user!.appUserId;
+    // Auto-end any of this user's prior live streams so they don't pile up as "ghost" lives.
+    await db.update(livestreamsTable)
+      .set({ status: "ended", endedAt: new Date() })
+      .where(and(eq(livestreamsTable.userId, ownerId), eq(livestreamsTable.status, "live")));
     const streamKey = `sk_${Math.random().toString(36).substring(2)}`;
     const mode = (req.body?.mode === "group") ? "group" : "solo";
     const inviteCode = mode === "group" ? genInviteCode() : null;
@@ -97,11 +101,15 @@ router.get("/livestreams/:id", async (req, res) => {
   }
 });
 
-// PATCH /livestreams/:id
-router.patch("/livestreams/:id", async (req, res) => {
+// PATCH /livestreams/:id — host-only
+router.patch("/livestreams/:id", requireAuth, async (req, res) => {
   try {
     const { id } = UpdateLivestreamParams.parse({ id: Number(req.params.id) });
     const body = UpdateLivestreamBody.parse(req.body);
+    const me = req.user!.appUserId;
+    const [existing] = await db.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
+    if (!existing) return res.status(404).json({ error: "Stream not found" });
+    if (existing.userId !== me) return res.status(403).json({ error: "Only the host can update this stream" });
     const updateData: Partial<typeof livestreamsTable.$inferInsert> = {};
     if (body.title) updateData.title = body.title;
     if (body.description) updateData.description = body.description;
