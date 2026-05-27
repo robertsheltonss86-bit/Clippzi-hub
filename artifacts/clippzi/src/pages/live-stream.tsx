@@ -394,28 +394,39 @@ export default function LiveStream() {
           </div>
         </div>
 
-        <div className="h-44 border-t border-border bg-black/40 p-2 flex flex-col gap-2">
-          <div className="flex items-center justify-between px-2 text-xs font-semibold text-muted-foreground uppercase">
-            <span>Send Gifts {battleActive ? "(adds to battle score)" : ""}</span>
-            <span className="text-primary flex items-center gap-1"><GiftIcon className="w-3 h-3" /> 60/40 split</span>
-          </div>
-          <ScrollArea className="flex-1">
-            <div className="grid grid-cols-4 gap-2 pb-2">
-              {gifts?.map((gift) => (
-                <button
-                  key={gift.id}
-                  onClick={() => handleSendGift(gift.id, gift.name, Number(gift.price))}
-                  className={`flex flex-col items-center justify-center p-2 rounded-lg bg-black/60 border-2 transition-all hover:scale-105 hover:bg-zinc-800 ${getRarityColor(gift.rarity)}`}
-                  data-testid={`button-gift-${gift.id}`}
-                >
-                  <span className="text-2xl mb-1 filter drop-shadow-md">{gift.emoji}</span>
-                  <span className="text-[10px] text-white font-medium truncate w-full text-center">{gift.name}</span>
-                  <span className="text-[10px] text-primary font-bold">${Number(gift.price).toFixed(2)}</span>
-                </button>
-              ))}
+        {isOwnStream ? (
+          <div className="h-20 border-t border-border bg-black/40 px-3 py-2 flex items-center justify-between">
+            <div className="text-xs text-muted-foreground">
+              💝 Gifts received this stream
             </div>
-          </ScrollArea>
-        </div>
+            <div className="text-lg font-bold text-primary">
+              ${Number(stream?.totalGiftsReceived ?? 0).toFixed(2)}
+            </div>
+          </div>
+        ) : (
+          <div className="h-44 border-t border-border bg-black/40 p-2 flex flex-col gap-2">
+            <div className="flex items-center justify-between px-2 text-xs font-semibold text-muted-foreground uppercase">
+              <span>Send Gifts {battleActive ? "(adds to battle score)" : ""}</span>
+              <span className="text-primary flex items-center gap-1"><GiftIcon className="w-3 h-3" /> 60/40 split</span>
+            </div>
+            <ScrollArea className="flex-1">
+              <div className="grid grid-cols-4 gap-2 pb-2">
+                {gifts?.map((gift) => (
+                  <button
+                    key={gift.id}
+                    onClick={() => handleSendGift(gift.id, gift.name, Number(gift.price))}
+                    className={`flex flex-col items-center justify-center p-2 rounded-lg bg-black/60 border-2 transition-all hover:scale-105 hover:bg-zinc-800 ${getRarityColor(gift.rarity)}`}
+                    data-testid={`button-gift-${gift.id}`}
+                  >
+                    <span className="text-2xl mb-1 filter drop-shadow-md">{gift.emoji}</span>
+                    <span className="text-[10px] text-white font-medium truncate w-full text-center">{gift.name}</span>
+                    <span className="text-[10px] text-primary font-bold">${Number(gift.price).toFixed(2)}</span>
+                  </button>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
 
         <form
           onSubmit={(e) => { e.preventDefault(); handleSendChat(); }}
