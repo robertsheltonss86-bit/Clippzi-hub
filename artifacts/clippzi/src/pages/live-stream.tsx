@@ -426,7 +426,17 @@ export default function LiveStream() {
               >
                 <ArrowLeft className="w-4 h-4" />
               </Button>
-              {isOwnStream ? null : (
+              {isOwnStream ? (
+                <div className="flex items-center gap-1 bg-black/55 backdrop-blur px-2 py-1 rounded-full border border-white/10">
+                  <span className="px-1.5 py-0.5 rounded-full bg-secondary text-white text-[9px] font-bold uppercase tracking-wider">Live</span>
+                  <span className="flex items-center gap-0.5 text-white text-[11px] font-semibold" data-testid="text-viewer-count">
+                    <Users className="w-3 h-3 text-primary" /> {stream?.viewerCount ?? 0}
+                  </span>
+                  <span className="flex items-center gap-0.5 text-white text-[11px] font-semibold" data-testid="text-like-count">
+                    <Heart className="w-3 h-3 text-secondary fill-secondary" /> {formatCount(totalLikes)}
+                  </span>
+                </div>
+              ) : (
                 <div className="flex items-center gap-2 bg-black/50 backdrop-blur p-1.5 pr-2 rounded-full border border-white/10 min-w-0 flex-1">
                   <img src={stream?.user?.avatarUrl || "/assets/avatar1.png"} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" />
                   <div className="min-w-0 flex-1">

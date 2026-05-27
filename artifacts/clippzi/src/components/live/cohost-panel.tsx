@@ -149,16 +149,19 @@ export function CohostPanel({ streamId, isHost, onChanged }: { streamId: number;
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button
-          size="sm"
-          className="rounded-full bg-primary/90 hover:bg-primary text-black h-8 px-3 text-xs gap-1 font-bold"
+        <button
+          className="flex flex-col items-center gap-0.5 group relative"
           data-testid="button-cohost-panel"
+          title={isHost ? "Co-hosts" : "Join"}
         >
-          <UserPlus className="w-3.5 h-3.5" /> {isHost ? "Co-hosts" : "Join"}
+          <div className="w-11 h-11 rounded-full bg-primary/90 flex items-center justify-center group-active:scale-95 transition-transform">
+            <UserPlus className="w-5 h-5 text-black" />
+          </div>
+          <span className="text-[10px] text-white font-semibold drop-shadow">{isHost ? "Co-hosts" : "Join"}</span>
           {isHost && pending.length > 0 && (
-            <span className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-secondary text-white text-[10px]">{pending.length}</span>
+            <span className="absolute -top-1 -right-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-secondary text-white text-[10px] font-bold border-2 border-black">{pending.length}</span>
           )}
-        </Button>
+        </button>
       </SheetTrigger>
       <SheetContent side="right" className="bg-card border-border w-full sm:max-w-md flex flex-col">
         <SheetHeader>
