@@ -13,7 +13,8 @@ import {
 } from "@workspace/api-client-react";
 import { useParams } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Gift as GiftIcon, Heart, Send, Sparkles, Filter, Swords, Share2, MessageCircle, ChevronDown } from "lucide-react";
+import { Users, Gift as GiftIcon, Heart, Send, Sparkles, Filter, Swords, Share2, X, Check } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -69,6 +70,15 @@ export default function LiveStream() {
   const sendChatMutation = useSendLiveChat();
 
   const [activeFilter, setActiveFilter] = useState("None");
+  const FILTER_CSS: Record<string, string> = {
+    "None": "",
+    "Beauty": "contrast(1.05) brightness(1.08) saturate(1.2)",
+    "Vintage": "sepia(0.5) contrast(0.95) brightness(1.05) saturate(0.85)",
+    "Neon": "saturate(2) contrast(1.3) hue-rotate(20deg) brightness(1.1)",
+    "Blur": "blur(4px)",
+    "Cartoon": "contrast(1.4) saturate(1.8) brightness(1.05)",
+  };
+  const filterCss = FILTER_CSS[activeFilter] || "";
   const [battleOpen, setBattleOpen] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [chatInput, setChatInput] = useState("");
@@ -167,18 +177,82 @@ export default function LiveStream() {
     );
   };
 
-  const handleStartBattle = (opponentStreamId: number) => {
-    startBattle.mutate(
-      { id: streamId, data: { opponentStreamId, durationSeconds: 180 } },
-      {
-        onSuccess: () => {
-          setBattleOpen(false);
-          toast({ title: "⚔️ Battle started!", description: "3-minute gift battle is on." });
-          refreshStream();
-        },
-        onError: () => toast({ title: "Couldn't start battle", variant: "destructive" }),
-      },
-    );
+  // Send a battle REQUEST (other host must accept)
+  const handleRequestBattle = async (opponentStreamId: number) => {
+    try {
+      const base = import.meta.env.BASE_URL;
+      const r = await fetch(`${base}api/livestreams/${streamId}/battle/request`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ opponentStreamId, durationSeconds: 180 }),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        toast({ title: "Couldn't send battle request", description: data?.error ?? `HTTP ${r.status}`, variant: "destructive" });
+        return;
+      }
+      setBattleOpen(false);
+      toast({ title: "⚔️ Battle request sent", description: "Waiting for the other host to accept." });
+    } catch (e: any) {
+      toast({ title: "Couldn't send battle request", description: String(e?.message ?? e), variant: "destructive" });
+    }
+  };
+
+  // Battle requests: poll incoming/outgoing — host only (endpoint is host-gated)
+  const [battleReqs, setBattleReqs] = useState<{ incoming: any[]; outgoing: any[] }>({ incoming: [], outgoing: [] });
+  const isOwnStreamPoll = !!CURRENT_USER_ID && stream?.userId === CURRENT_USER_ID;
+  useEffect(() => {
+    if (!streamId || !stream || stream.battleOpponentId || !isOwnStreamPoll) return;
+    let alive = true;
+    const tick = async () => {
+      try {
+        const base = import.meta.env.BASE_URL;
+        const r = await fetch(`${base}api/livestreams/${streamId}/battle/requests`, { credentials: "include" });
+        if (!r.ok) return;
+        const data = await r.json();
+        if (alive) setBattleReqs({ incoming: data.incoming ?? [], outgoing: data.outgoing ?? [] });
+      } catch {}
+    };
+    tick();
+    const t = setInterval(tick, 4000);
+    return () => { alive = false; clearInterval(t); };
+  }, [streamId, stream?.battleOpponentId, isOwnStreamPoll]);
+
+  const acceptBattleRequest = async (requestId: number) => {
+    try {
+      const base = import.meta.env.BASE_URL;
+      const r = await fetch(`${base}api/livestreams/${streamId}/battle/requests/${requestId}/accept`, {
+        method: "POST", credentials: "include",
+      });
+      const data = await r.json();
+      if (!r.ok) { toast({ title: "Couldn't accept", description: data?.error, variant: "destructive" }); return; }
+      toast({ title: "⚔️ Battle started!", description: "3-minute gift battle is on." });
+      setBattleReqs({ incoming: [], outgoing: [] });
+      refreshStream();
+    } catch (e: any) {
+      toast({ title: "Couldn't accept", description: String(e?.message ?? e), variant: "destructive" });
+    }
+  };
+
+  const rejectBattleRequest = async (requestId: number) => {
+    try {
+      const base = import.meta.env.BASE_URL;
+      await fetch(`${base}api/livestreams/${streamId}/battle/requests/${requestId}/reject`, {
+        method: "POST", credentials: "include",
+      });
+      setBattleReqs((prev) => ({ ...prev, incoming: prev.incoming.filter((r) => r.id !== requestId) }));
+    } catch {}
+  };
+
+  const cancelBattleRequest = async (requestId: number) => {
+    try {
+      const base = import.meta.env.BASE_URL;
+      await fetch(`${base}api/livestreams/${streamId}/battle/requests/${requestId}`, {
+        method: "DELETE", credentials: "include",
+      });
+      setBattleReqs((prev) => ({ ...prev, outgoing: prev.outgoing.filter((r) => r.id !== requestId) }));
+    } catch {}
   };
 
   const handleEndBattle = () => {
@@ -225,7 +299,12 @@ export default function LiveStream() {
     }
   };
 
-  const [chatOpen, setChatOpen] = useState(false);
+  const mobileChatRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = mobileChatRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [chatMessages?.length]);
 
   if (streamLoading) {
     return <div className="h-full w-full flex items-center justify-center bg-black"><Skeleton className="w-full h-full" /></div>;
@@ -257,12 +336,12 @@ export default function LiveStream() {
           </div>
         ) : isGroup ? (
           <GroupRoomProvider streamId={streamId}>
-            <LiveKitGroupStage />
+            <LiveKitGroupStage filterCss={filterCss} />
             <GamesPanel />
           </GroupRoomProvider>
         ) : isOwnStream ? (
           <div className="absolute inset-0 bg-black">
-            <LiveKitBroadcaster streamId={streamId} />
+            <LiveKitBroadcaster streamId={streamId} filterCss={filterCss} />
           </div>
         ) : (
           <div className="absolute inset-0 bg-black">
@@ -301,16 +380,17 @@ export default function LiveStream() {
               <Button onClick={handleShare} size="icon" variant="ghost" className="rounded-full bg-black/60 backdrop-blur border border-white/10 h-8 w-8 text-white hover:bg-black/80" data-testid="button-share-stream">
                 <Share2 className="w-4 h-4" />
               </Button>
-              {isGroup && <CohostPanel streamId={streamId} isHost={isOwnStream} />}
+              {(isOwnStream || isGroup) && <CohostPanel streamId={streamId} isHost={isOwnStream} />}
               {battleActive ? (
                 <Button onClick={handleEndBattle} size="sm" className="rounded-full bg-red-600 hover:bg-red-700 text-white h-8 px-3 text-xs gap-1" data-testid="button-end-battle">
                   <Swords className="w-3.5 h-3.5" /> End Battle
                 </Button>
-              ) : (
+              ) : isOwnStream ? (
                 <Button onClick={() => setBattleOpen(true)} size="sm" className="rounded-full bg-accent hover:bg-accent/80 text-black h-8 px-3 text-xs gap-1 font-bold" data-testid="button-start-battle">
-                  <Swords className="w-3.5 h-3.5" /> Battle
+                  <Swords className="w-3.5 h-3.5" />
+                  {battleReqs.outgoing.length > 0 ? "Waiting…" : "Battle"}
                 </Button>
-              )}
+              ) : null}
               <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur px-3 py-1.5 rounded-full border border-white/10 text-white font-medium text-sm">
                 <Users className="w-4 h-4 text-primary" />
                 {stream?.viewerCount}
@@ -338,7 +418,7 @@ export default function LiveStream() {
             </div>
           )}
 
-          {!battleActive && (
+          {!battleActive && isOwnStream && (
             <div className="pointer-events-auto self-start flex flex-col gap-2">
               <div className="flex items-center gap-2 mb-2 bg-black/40 backdrop-blur px-3 py-1.5 rounded-full w-fit">
                 <Filter className="w-4 h-4 text-accent" />
@@ -352,6 +432,7 @@ export default function LiveStream() {
                     className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
                       activeFilter === f ? "bg-accent text-black scale-110 origin-left" : "bg-black/40 text-white border border-white/10 hover:bg-black/60"
                     }`}
+                    data-testid={`button-filter-${f.toLowerCase()}`}
                   >
                     {f}
                   </button>
@@ -360,28 +441,113 @@ export default function LiveStream() {
             </div>
           )}
         </div>
+
+        {/* INCOMING BATTLE REQUESTS BANNER */}
+        {!battleActive && isOwnStream && battleReqs.incoming.length > 0 && (
+          <div className="pointer-events-auto absolute top-20 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-sm space-y-2" data-testid="battle-requests-incoming">
+            {battleReqs.incoming.map((r) => (
+              <div key={r.id} className="bg-black/90 backdrop-blur border-2 border-accent rounded-2xl p-3 shadow-[0_0_20px_rgba(34,197,94,0.4)]">
+                <div className="flex items-center gap-3">
+                  <img src={r.otherStream?.user?.avatarUrl || "/assets/avatar1.png"} alt="" className="w-10 h-10 rounded-full object-cover ring-2 ring-accent" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] text-accent font-bold uppercase tracking-wider">⚔️ Battle request</p>
+                    <p className="text-sm text-white font-semibold truncate">{r.otherStream?.user?.displayName || "Someone"} wants to battle you</p>
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-2.5">
+                  <Button onClick={() => acceptBattleRequest(r.id)} size="sm" className="flex-1 bg-accent text-black font-bold hover:bg-accent/80" data-testid={`button-accept-battle-${r.id}`}>
+                    <Check className="w-4 h-4 mr-1" /> Accept
+                  </Button>
+                  <Button onClick={() => rejectBattleRequest(r.id)} size="sm" variant="secondary" className="flex-1" data-testid={`button-reject-battle-${r.id}`}>
+                    <X className="w-4 h-4 mr-1" /> Decline
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* OUTGOING REQUEST PILL */}
+        {!battleActive && isOwnStream && battleReqs.outgoing.length > 0 && battleReqs.incoming.length === 0 && (
+          <div className="pointer-events-auto absolute top-20 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-sm space-y-2">
+            {battleReqs.outgoing.map((r) => (
+              <div key={r.id} className="bg-black/85 backdrop-blur border border-accent/50 rounded-full pl-1.5 pr-3 py-1.5 flex items-center gap-2">
+                <img src={r.otherStream?.user?.avatarUrl || "/assets/avatar1.png"} alt="" className="w-6 h-6 rounded-full object-cover" />
+                <span className="text-xs text-white flex-1 truncate">Waiting on <b>{r.otherStream?.user?.displayName}</b>…</span>
+                <button onClick={() => cancelBattleRequest(r.id)} className="text-[11px] text-secondary font-semibold" data-testid={`button-cancel-battle-${r.id}`}>Cancel</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* TIKTOK-STYLE MOBILE CHAT OVERLAY — bottom 3/8 of video */}
+        <div className="lg:hidden absolute inset-x-0 bottom-0 h-[38%] z-30 flex flex-col pointer-events-none">
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none" />
+          <div ref={mobileChatRef} className="relative flex-1 overflow-y-auto px-2 pt-2 space-y-1.5 pointer-events-auto scrollbar-none" data-testid="mobile-chat-list" style={{ scrollbarWidth: "none" }}>
+            {(!chatMessages || chatMessages.length === 0) ? (
+              <div className="text-xs text-white/70 bg-black/40 backdrop-blur px-2.5 py-1.5 rounded-full w-fit">Be the first to say hi 👋</div>
+            ) : (
+              chatMessages.map((m) => {
+                const name = m.user?.displayName || m.user?.username || `User${m.userId}`;
+                const isMe = m.userId === CURRENT_USER_ID;
+                return (
+                  <div key={m.id} className="flex items-start gap-1.5 max-w-[88%]" data-testid={`mobile-chat-message-${m.id}`}>
+                    <img src={m.user?.avatarUrl || `/assets/avatar${(m.userId % 3) + 1}.png`} alt="" className="w-5 h-5 rounded-full object-cover shrink-0 mt-0.5" />
+                    <div className="bg-black/60 backdrop-blur px-2 py-1 rounded-xl">
+                      <span className={`font-bold text-xs mr-1.5 ${isMe ? "text-primary" : colorForUser(m.userId)}`}>{name}{isMe ? " (you)" : ""}</span>
+                      <span className="text-xs text-white/95 break-words">{m.message}</span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+          <div className="relative pointer-events-auto p-2 flex gap-2 items-center">
+            <form onSubmit={(e) => { e.preventDefault(); handleSendChat(); }} className="flex-1 flex gap-2 items-center">
+              <Input
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder={isAuthenticated ? "Say something..." : "Log in to chat"}
+                maxLength={500}
+                className="bg-black/60 backdrop-blur border-white/20 text-white placeholder:text-white/60 rounded-full h-9"
+                data-testid="input-mobile-chat-message"
+              />
+              <Button type="submit" size="icon" disabled={sendChatMutation.isPending || !chatInput.trim()} className="rounded-full bg-primary hover:bg-primary/80 shrink-0 h-9 w-9 disabled:opacity-50" data-testid="button-send-mobile-chat">
+                <Send className="w-4 h-4 text-black" />
+              </Button>
+            </form>
+            {!isOwnStream && (
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button size="icon" className="rounded-full bg-accent hover:bg-accent/80 text-black h-9 w-9 shrink-0" data-testid="button-gifts-mobile">
+                    <GiftIcon className="w-4 h-4" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="bottom" className="bg-card border-border h-[65vh] flex flex-col">
+                  <SheetHeader>
+                    <SheetTitle className="text-white flex items-center gap-2"><GiftIcon className="w-5 h-5 text-primary" /> Send a Gift</SheetTitle>
+                  </SheetHeader>
+                  <p className="text-xs text-muted-foreground mt-1 mb-3">60/40 split — creator keeps 60%{battleActive ? " • adds to battle score" : ""}</p>
+                  <ScrollArea className="flex-1">
+                    <div className="grid grid-cols-4 gap-2 pb-4">
+                      {gifts?.map((gift) => (
+                        <button key={gift.id} onClick={() => handleSendGift(gift.id, gift.name, Number(gift.price))} className={`flex flex-col items-center justify-center p-2 rounded-lg bg-black/60 border-2 transition-all hover:scale-105 hover:bg-zinc-800 ${getRarityColor(gift.rarity)}`} data-testid={`button-gift-mobile-${gift.id}`}>
+                          <span className="text-2xl mb-1 drop-shadow-md">{gift.emoji}</span>
+                          <span className="text-[10px] text-white font-medium truncate w-full text-center">{gift.name}</span>
+                          <span className="text-[10px] text-primary font-bold">${Number(gift.price).toFixed(2)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </SheetContent>
+              </Sheet>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Mobile: floating chat toggle button (top-right of video area when chat closed) */}
-      <button
-        onClick={() => setChatOpen((v) => !v)}
-        className="lg:hidden fixed bottom-4 right-4 z-40 bg-primary text-black w-12 h-12 rounded-full shadow-lg flex items-center justify-center font-bold"
-        data-testid="button-toggle-chat"
-        aria-label="Toggle chat"
-      >
-        {chatOpen ? <ChevronDown className="w-5 h-5" /> : <MessageCircle className="w-5 h-5" />}
-      </button>
-
-      <div
-        className={`
-          fixed lg:relative inset-x-0 bottom-0 lg:inset-auto
-          h-[65vh] lg:h-full w-full lg:w-[400px]
-          flex flex-col bg-card border-t lg:border-t-0 lg:border-l border-border
-          z-30 transition-transform duration-300
-          ${chatOpen ? "translate-y-0" : "translate-y-full"} lg:translate-y-0
-          rounded-t-2xl lg:rounded-none
-        `}
-      >
+      {/* DESKTOP CHAT SIDEBAR */}
+      <div className="hidden lg:flex h-full w-[400px] flex-col bg-card border-l border-border">
         <div className="p-3 border-b border-border bg-black/20 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-semibold text-primary">
             <Sparkles className="w-4 h-4" /> Live Chat
@@ -397,24 +563,16 @@ export default function LiveStream() {
               Welcome to the chat — keep it kind. 💚
             </div>
             {(!chatMessages || chatMessages.length === 0) ? (
-              <div className="text-center text-sm text-muted-foreground py-8">
-                Be the first to say hi 👋
-              </div>
+              <div className="text-center text-sm text-muted-foreground py-8">Be the first to say hi 👋</div>
             ) : (
               chatMessages.map((m) => {
                 const name = m.user?.displayName || m.user?.username || `User${m.userId}`;
                 const isMe = m.userId === CURRENT_USER_ID;
                 return (
                   <div key={m.id} className="flex items-start gap-2" data-testid={`chat-message-${m.id}`}>
-                    <img
-                      src={m.user?.avatarUrl || `/assets/avatar${(m.userId % 3) + 1}.png`}
-                      alt=""
-                      className="w-7 h-7 rounded-full object-cover shrink-0"
-                    />
+                    <img src={m.user?.avatarUrl || `/assets/avatar${(m.userId % 3) + 1}.png`} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <span className={`font-bold text-sm mr-2 ${isMe ? "text-primary" : colorForUser(m.userId)}`}>
-                        {name}{isMe ? " (you)" : ""}
-                      </span>
+                      <span className={`font-bold text-sm mr-2 ${isMe ? "text-primary" : colorForUser(m.userId)}`}>{name}{isMe ? " (you)" : ""}</span>
                       <span className="text-sm text-white/90 break-words">{m.message}</span>
                     </div>
                   </div>
@@ -427,12 +585,8 @@ export default function LiveStream() {
 
         {isOwnStream ? (
           <div className="h-20 border-t border-border bg-black/40 px-3 py-2 flex items-center justify-between">
-            <div className="text-xs text-muted-foreground">
-              💝 Gifts received this stream
-            </div>
-            <div className="text-lg font-bold text-primary">
-              ${Number(stream?.totalGiftsReceived ?? 0).toFixed(2)}
-            </div>
+            <div className="text-xs text-muted-foreground">💝 Gifts received this stream</div>
+            <div className="text-lg font-bold text-primary">${Number(stream?.totalGiftsReceived ?? 0).toFixed(2)}</div>
           </div>
         ) : (
           <div className="h-44 border-t border-border bg-black/40 p-2 flex flex-col gap-2">
@@ -443,13 +597,8 @@ export default function LiveStream() {
             <ScrollArea className="flex-1">
               <div className="grid grid-cols-4 gap-2 pb-2">
                 {gifts?.map((gift) => (
-                  <button
-                    key={gift.id}
-                    onClick={() => handleSendGift(gift.id, gift.name, Number(gift.price))}
-                    className={`flex flex-col items-center justify-center p-2 rounded-lg bg-black/60 border-2 transition-all hover:scale-105 hover:bg-zinc-800 ${getRarityColor(gift.rarity)}`}
-                    data-testid={`button-gift-${gift.id}`}
-                  >
-                    <span className="text-2xl mb-1 filter drop-shadow-md">{gift.emoji}</span>
+                  <button key={gift.id} onClick={() => handleSendGift(gift.id, gift.name, Number(gift.price))} className={`flex flex-col items-center justify-center p-2 rounded-lg bg-black/60 border-2 transition-all hover:scale-105 hover:bg-zinc-800 ${getRarityColor(gift.rarity)}`} data-testid={`button-gift-${gift.id}`}>
+                    <span className="text-2xl mb-1 drop-shadow-md">{gift.emoji}</span>
                     <span className="text-[10px] text-white font-medium truncate w-full text-center">{gift.name}</span>
                     <span className="text-[10px] text-primary font-bold">${Number(gift.price).toFixed(2)}</span>
                   </button>
@@ -459,30 +608,12 @@ export default function LiveStream() {
           </div>
         )}
 
-        <form
-          onSubmit={(e) => { e.preventDefault(); handleSendChat(); }}
-          className="p-3 border-t border-border bg-card flex gap-2 items-center"
-        >
+        <form onSubmit={(e) => { e.preventDefault(); handleSendChat(); }} className="p-3 border-t border-border bg-card flex gap-2 items-center">
           <div className="relative flex-1">
-            <Input
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              placeholder={isAuthenticated ? "Say something..." : "Log in to chat"}
-              maxLength={500}
-              className="bg-input border-none rounded-full pr-10"
-              data-testid="input-chat-message"
-            />
-            <div className="absolute right-3 top-1/2 -translate-y-1/2">
-              <Heart className="w-4 h-4 text-muted-foreground" />
-            </div>
+            <Input value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder={isAuthenticated ? "Say something..." : "Log in to chat"} maxLength={500} className="bg-input border-none rounded-full pr-10" data-testid="input-chat-message" />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2"><Heart className="w-4 h-4 text-muted-foreground" /></div>
           </div>
-          <Button
-            type="submit"
-            size="icon"
-            disabled={sendChatMutation.isPending || !chatInput.trim()}
-            className="rounded-full bg-primary hover:bg-primary/80 shrink-0 disabled:opacity-50"
-            data-testid="button-send-chat"
-          >
+          <Button type="submit" size="icon" disabled={sendChatMutation.isPending || !chatInput.trim()} className="rounded-full bg-primary hover:bg-primary/80 shrink-0 disabled:opacity-50" data-testid="button-send-chat">
             <Send className="w-4 h-4 text-black" />
           </Button>
         </form>
@@ -491,28 +622,38 @@ export default function LiveStream() {
       <Dialog open={battleOpen} onOpenChange={setBattleOpen}>
         <DialogContent className="bg-card border-border">
           <DialogHeader>
-            <DialogTitle className="text-white flex items-center gap-2"><Swords className="w-5 h-5 text-accent" /> Pick a Battle Opponent</DialogTitle>
+            <DialogTitle className="text-white flex items-center gap-2"><Swords className="w-5 h-5 text-accent" /> Send a Battle Request</DialogTitle>
           </DialogHeader>
+          <p className="text-xs text-muted-foreground -mt-2 mb-1">Pick another live streamer — they have to accept before the battle starts.</p>
           <div className="space-y-2 max-h-80 overflow-y-auto">
             {otherStreams.length === 0 ? (
               <p className="text-muted-foreground text-sm py-8 text-center">No other streamers available right now.</p>
-            ) : otherStreams.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => handleStartBattle(s.id)}
-                disabled={startBattle.isPending}
-                className="w-full flex items-center gap-3 p-3 rounded-lg bg-black/40 hover:bg-black/60 transition-colors border border-border hover:border-accent text-left"
-                data-testid={`button-opponent-${s.id}`}
-              >
-                <img src={s.user?.avatarUrl || "/assets/avatar1.png"} alt="" className="w-10 h-10 rounded-full object-cover" />
-                <div className="flex-1 overflow-hidden">
-                  <p className="text-white font-semibold text-sm truncate">{s.user?.displayName}</p>
-                  <p className="text-xs text-muted-foreground truncate">{s.title}</p>
-                </div>
-                <Users className="w-3.5 h-3.5 text-primary" />
-                <span className="text-xs text-white">{s.viewerCount}</span>
-              </button>
-            ))}
+            ) : otherStreams.map((s) => {
+              const alreadyRequested = battleReqs.outgoing.some((r) => r.otherStream?.id === s.id);
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => !alreadyRequested && handleRequestBattle(s.id)}
+                  disabled={alreadyRequested}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg bg-black/40 hover:bg-black/60 transition-colors border border-border hover:border-accent text-left disabled:opacity-60 disabled:cursor-not-allowed"
+                  data-testid={`button-opponent-${s.id}`}
+                >
+                  <img src={s.user?.avatarUrl || "/assets/avatar1.png"} alt="" className="w-10 h-10 rounded-full object-cover" />
+                  <div className="flex-1 overflow-hidden">
+                    <p className="text-white font-semibold text-sm truncate">{s.user?.displayName}</p>
+                    <p className="text-xs text-muted-foreground truncate">{s.title}</p>
+                  </div>
+                  {alreadyRequested ? (
+                    <span className="text-[10px] text-accent font-bold uppercase">Pending</span>
+                  ) : (
+                    <>
+                      <Users className="w-3.5 h-3.5 text-primary" />
+                      <span className="text-xs text-white">{s.viewerCount}</span>
+                    </>
+                  )}
+                </button>
+              );
+            })}
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setBattleOpen(false)}>Cancel</Button>

@@ -30,7 +30,7 @@ async function fetchToken(streamId: number, role: "publisher" | "viewer"): Promi
 /**
  * Host's view: publishes camera + mic to the room. Shows local preview (mirrored).
  */
-export function LiveKitBroadcaster({ streamId }: { streamId: number }) {
+export function LiveKitBroadcaster({ streamId, filterCss }: { streamId: number; filterCss?: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const roomRef = useRef<Room | null>(null);
   const [status, setStatus] = useState<Status>("idle");
@@ -127,7 +127,7 @@ export function LiveKitBroadcaster({ streamId }: { streamId: number }) {
         playsInline
         muted
         className="w-full h-full object-cover"
-        style={{ transform: "scaleX(-1)" }}
+        style={{ transform: "scaleX(-1)", filter: filterCss || "none" }}
       />
       {status !== "live" && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/85 p-6 z-30">

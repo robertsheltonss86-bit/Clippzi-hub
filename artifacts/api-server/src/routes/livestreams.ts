@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { livestreamsTable, usersTable, liveChatMessagesTable, livestreamCohostsTable } from "@workspace/db";
+import { livestreamsTable, usersTable, liveChatMessagesTable, livestreamCohostsTable, livestreamBattleRequestsTable } from "@workspace/db";
 import { and } from "drizzle-orm";
 import { eq, sql, desc, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/authMiddleware";
@@ -520,6 +520,215 @@ router.delete("/livestreams/:id/cohosts/:userId", requireAuth, async (req, res) 
       .where(and(eq(livestreamCohostsTable.streamId, id), eq(livestreamCohostsTable.userId, targetUserId)));
     // Kick from LiveKit room so they immediately lose publish rights (token TTL is 2h)
     await removeLivekitParticipant(`stream-${id}`, `cohost-${id}-${targetUserId}`);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+// POST /livestreams/:id/enable-group — host converts solo → group (mints invite code)
+router.post("/livestreams/:id/enable-group", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const me = req.user!.appUserId;
+    const [stream] = await db.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
+    if (!stream) return res.status(404).json({ error: "Stream not found" });
+    if (stream.userId !== me) return res.status(403).json({ error: "Only the host can enable group mode" });
+    const inviteCode = stream.inviteCode || genInviteCode();
+    const [updated] = await db.update(livestreamsTable).set({
+      mode: "group",
+      inviteCode,
+    }).where(eq(livestreamsTable.id, id)).returning();
+    res.json(await enrichStream(updated));
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+// ===== Battle requests (request → accept/reject → start) =====
+
+// POST /livestreams/:id/battle/request — { opponentStreamId, durationSeconds? }
+router.post("/livestreams/:id/battle/request", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const me = req.user!.appUserId;
+    const opponentStreamId = Number(req.body?.opponentStreamId);
+    const durationSeconds = Math.min(Math.max(Number(req.body?.durationSeconds) || 180, 30), 600);
+    if (!Number.isFinite(id) || !Number.isFinite(opponentStreamId)) return res.status(400).json({ error: "Invalid id" });
+    if (id === opponentStreamId) return res.status(400).json({ error: "Cannot battle yourself" });
+    // Atomic dedup via unique partial index (from_stream_id, to_stream_id) WHERE status='pending'.
+    // Lock both stream rows in deterministic id order to avoid deadlocks.
+    const result = await db.transaction(async (tx) => {
+      const [a, b] = id < opponentStreamId ? [id, opponentStreamId] : [opponentStreamId, id];
+      const lockRows = await tx.execute(sql`
+        SELECT id, user_id AS "userId", status, battle_opponent_id AS "battleOpponentId"
+        FROM livestreams WHERE id IN (${a}, ${b}) FOR UPDATE
+      `).then((r: any) => (r.rows ?? r) as any[]);
+      const me_stream = lockRows.find((s: any) => s.id === id);
+      const opp = lockRows.find((s: any) => s.id === opponentStreamId);
+      if (!me_stream || !opp) return { code: 404, body: { error: "Stream not found" } };
+      if (me_stream.userId !== me) return { code: 403, body: { error: "Only the host can request a battle" } };
+      if (me_stream.status !== "live" || opp.status !== "live") return { code: 400, body: { error: "Both streams must be live" } };
+      if (me_stream.battleOpponentId || opp.battleOpponentId) return { code: 409, body: { error: "One of the streams is already in a battle" } };
+      // Insert with ON CONFLICT DO NOTHING on the partial unique index — safe under races
+      const inserted: any = await tx.execute(sql`
+        INSERT INTO livestream_battle_requests (from_stream_id, to_stream_id, status, duration_seconds)
+        VALUES (${id}, ${opponentStreamId}, 'pending', ${durationSeconds})
+        ON CONFLICT (from_stream_id, to_stream_id) WHERE status = 'pending' DO NOTHING
+        RETURNING id
+      `).then((r: any) => (r.rows ?? r) as any[]);
+      if (inserted.length > 0) return { code: 200, body: { status: "pending", id: inserted[0].id } };
+      // Duplicate: return existing pending row
+      const [existing] = await tx.select().from(livestreamBattleRequestsTable)
+        .where(and(
+          eq(livestreamBattleRequestsTable.fromStreamId, id),
+          eq(livestreamBattleRequestsTable.toStreamId, opponentStreamId),
+          eq(livestreamBattleRequestsTable.status, "pending"),
+        ));
+      return { code: 200, body: { status: "pending", id: existing?.id } };
+    });
+    res.status(result.code).json(result.body);
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+// GET /livestreams/:id/battle/requests — list incoming + outgoing pending for this stream (host-only)
+router.get("/livestreams/:id/battle/requests", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+    const me = req.user!.appUserId;
+    const [stream] = await db.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
+    if (!stream) return res.status(404).json({ error: "Stream not found" });
+    if (stream.userId !== me) return res.status(403).json({ error: "Only the host can view battle requests" });
+    const incoming = await db.select().from(livestreamBattleRequestsTable)
+      .where(and(eq(livestreamBattleRequestsTable.toStreamId, id), eq(livestreamBattleRequestsTable.status, "pending")));
+    const outgoing = await db.select().from(livestreamBattleRequestsTable)
+      .where(and(eq(livestreamBattleRequestsTable.fromStreamId, id), eq(livestreamBattleRequestsTable.status, "pending")));
+    const streamIds = Array.from(new Set([...incoming.map(r => r.fromStreamId), ...outgoing.map(r => r.toStreamId)]));
+    const streams = streamIds.length ? await db.select().from(livestreamsTable).where(inArray(livestreamsTable.id, streamIds)) : [];
+    const userIds = streams.map(s => s.userId);
+    const users = userIds.length ? await db.select().from(usersTable).where(inArray(usersTable.id, userIds)) : [];
+    const streamMap = new Map(streams.map(s => [s.id, s]));
+    const userMap = new Map(users.map(u => [u.id, u]));
+    const enrich = (r: any, otherStreamId: number) => {
+      const s = streamMap.get(otherStreamId);
+      const u = s ? userMap.get(s.userId) : null;
+      return {
+        id: r.id,
+        fromStreamId: r.fromStreamId,
+        toStreamId: r.toStreamId,
+        durationSeconds: r.durationSeconds,
+        createdAt: r.createdAt.toISOString(),
+        otherStream: s ? {
+          id: s.id, title: s.title, thumbnailUrl: s.thumbnailUrl, userId: s.userId,
+          user: u ? { id: u.id, displayName: u.displayName, username: u.username, avatarUrl: u.avatarUrl } : null,
+        } : null,
+      };
+    };
+    res.json({
+      incoming: incoming.map(r => enrich(r, r.fromStreamId)),
+      outgoing: outgoing.map(r => enrich(r, r.toStreamId)),
+    });
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+// POST /livestreams/:id/battle/requests/:requestId/accept — accept incoming request and start battle
+router.post("/livestreams/:id/battle/requests/:requestId/accept", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const requestId = Number(req.params.requestId);
+    const me = req.user!.appUserId;
+    const result = await db.transaction(async (tx) => {
+      // Lock the request row first
+      const reqLocked: any = await tx.execute(sql`
+        SELECT id, from_stream_id AS "fromStreamId", to_stream_id AS "toStreamId", status, duration_seconds AS "durationSeconds"
+        FROM livestream_battle_requests WHERE id = ${requestId} FOR UPDATE
+      `).then((r: any) => (r.rows ?? r) as any[]);
+      const reqRow = reqLocked[0];
+      if (!reqRow || reqRow.toStreamId !== id) return { code: 404, body: { error: "Request not found" } };
+      if (reqRow.status !== "pending") return { code: 409, body: { error: "Request is not pending" } };
+      // Lock both stream rows in id order
+      const [a, b] = id < reqRow.fromStreamId ? [id, reqRow.fromStreamId] : [reqRow.fromStreamId, id];
+      const lockRows: any = await tx.execute(sql`
+        SELECT id, user_id AS "userId", status, battle_opponent_id AS "battleOpponentId"
+        FROM livestreams WHERE id IN (${a}, ${b}) FOR UPDATE
+      `).then((r: any) => (r.rows ?? r) as any[]);
+      const me_stream = lockRows.find((s: any) => s.id === id);
+      const opp = lockRows.find((s: any) => s.id === reqRow.fromStreamId);
+      if (!me_stream || !opp) return { code: 404, body: { error: "Stream not found" } };
+      if (me_stream.userId !== me) return { code: 403, body: { error: "Only the host can accept" } };
+      if (me_stream.status !== "live" || opp.status !== "live") return { code: 400, body: { error: "Both streams must be live" } };
+      if (me_stream.battleOpponentId || opp.battleOpponentId) return { code: 409, body: { error: "One of the streams is already in a battle" } };
+      const endsAt = new Date(Date.now() + reqRow.durationSeconds * 1000);
+      await tx.update(livestreamsTable).set({
+        battleOpponentId: opp.id, battleScore: "0", battleOpponentScore: "0", battleEndsAt: endsAt,
+      }).where(eq(livestreamsTable.id, id));
+      await tx.update(livestreamsTable).set({
+        battleOpponentId: id, battleScore: "0", battleOpponentScore: "0", battleEndsAt: endsAt,
+      }).where(eq(livestreamsTable.id, opp.id));
+      await tx.update(livestreamBattleRequestsTable).set({ status: "accepted" })
+        .where(eq(livestreamBattleRequestsTable.id, requestId));
+      // Cancel any other pending requests involving either stream so they can't be accepted later
+      await tx.execute(sql`
+        UPDATE livestream_battle_requests SET status = 'cancelled'
+        WHERE status = 'pending'
+          AND id <> ${requestId}
+          AND (from_stream_id IN (${id}, ${opp.id}) OR to_stream_id IN (${id}, ${opp.id}))
+      `);
+      return { code: 200, body: { ok: true } };
+    });
+    res.status(result.code).json(result.body);
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+// POST /livestreams/:id/battle/requests/:requestId/reject — reject incoming (pending only)
+router.post("/livestreams/:id/battle/requests/:requestId/reject", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const requestId = Number(req.params.requestId);
+    const me = req.user!.appUserId;
+    const [reqRow] = await db.select().from(livestreamBattleRequestsTable)
+      .where(eq(livestreamBattleRequestsTable.id, requestId));
+    if (!reqRow || reqRow.toStreamId !== id) return res.status(404).json({ error: "Request not found" });
+    if (reqRow.status !== "pending") return res.status(409).json({ error: "Request is not pending" });
+    const [me_stream] = await db.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
+    if (!me_stream || me_stream.userId !== me) return res.status(403).json({ error: "Only the host can reject" });
+    // Conditional update — only if still pending
+    await db.update(livestreamBattleRequestsTable).set({ status: "rejected" })
+      .where(and(
+        eq(livestreamBattleRequestsTable.id, requestId),
+        eq(livestreamBattleRequestsTable.status, "pending"),
+      ));
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+// DELETE /livestreams/:id/battle/requests/:requestId — sender cancels their outgoing request (pending only)
+router.delete("/livestreams/:id/battle/requests/:requestId", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const requestId = Number(req.params.requestId);
+    const me = req.user!.appUserId;
+    const [reqRow] = await db.select().from(livestreamBattleRequestsTable)
+      .where(eq(livestreamBattleRequestsTable.id, requestId));
+    if (!reqRow || reqRow.fromStreamId !== id) return res.status(404).json({ error: "Request not found" });
+    if (reqRow.status !== "pending") return res.status(409).json({ error: "Request is not pending" });
+    const [me_stream] = await db.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
+    if (!me_stream || me_stream.userId !== me) return res.status(403).json({ error: "Only the host can cancel" });
+    // Conditional update — only if still pending
+    await db.update(livestreamBattleRequestsTable).set({ status: "cancelled" })
+      .where(and(
+        eq(livestreamBattleRequestsTable.id, requestId),
+        eq(livestreamBattleRequestsTable.status, "pending"),
+      ));
     res.json({ ok: true });
   } catch (e) {
     res.status(400).json({ error: String(e) });

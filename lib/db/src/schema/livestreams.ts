@@ -49,9 +49,19 @@ export const livestreamCohostsTable = pgTable("livestream_cohosts", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const livestreamBattleRequestsTable = pgTable("livestream_battle_requests", {
+  id: serial("id").primaryKey(),
+  fromStreamId: integer("from_stream_id").notNull().references(() => livestreamsTable.id, { onDelete: "cascade" }),
+  toStreamId: integer("to_stream_id").notNull().references(() => livestreamsTable.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("pending"),
+  durationSeconds: integer("duration_seconds").notNull().default(180),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const insertLivestreamSchema = createInsertSchema(livestreamsTable).omit({ id: true, createdAt: true });
 
 export type InsertLivestream = z.infer<typeof insertLivestreamSchema>;
 export type Livestream = typeof livestreamsTable.$inferSelect;
 export type LiveChatMessage = typeof liveChatMessagesTable.$inferSelect;
 export type LivestreamCohost = typeof livestreamCohostsTable.$inferSelect;
+export type LivestreamBattleRequest = typeof livestreamBattleRequestsTable.$inferSelect;

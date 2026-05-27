@@ -48,7 +48,22 @@ export function CohostPanel({ streamId, isHost, onChanged }: { streamId: number;
   const [loading, setLoading] = useState(false);
   const [code, setCode] = useState("");
   const [copied, setCopied] = useState(false);
+  const [enabling, setEnabling] = useState(false);
   const [myStatus, setMyStatus] = useState<"none" | "pending" | "approved" | "rejected">("none");
+  const isGroup = data?.mode === "group";
+
+  const enableGroup = async () => {
+    setEnabling(true);
+    try {
+      await apiPost(`/livestreams/${streamId}/enable-group`);
+      toast({ title: "Group live enabled 🎉", description: "Up to 15 co-hosts can now join your camera grid." });
+      // Reload so the page re-mounts with GroupRoomProvider
+      setTimeout(() => window.location.reload(), 600);
+    } catch (e: any) {
+      toast({ title: "Couldn't enable", description: e.message, variant: "destructive" });
+      setEnabling(false);
+    }
+  };
 
   const refresh = async () => {
     setLoading(true);
@@ -139,7 +154,7 @@ export function CohostPanel({ streamId, isHost, onChanged }: { streamId: number;
           className="rounded-full bg-primary/90 hover:bg-primary text-black h-8 px-3 text-xs gap-1 font-bold"
           data-testid="button-cohost-panel"
         >
-          <Users className="w-3.5 h-3.5" /> Group
+          <UserPlus className="w-3.5 h-3.5" /> {isHost ? "Co-hosts" : "Join"}
           {isHost && pending.length > 0 && (
             <span className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full bg-secondary text-white text-[10px]">{pending.length}</span>
           )}
@@ -151,7 +166,18 @@ export function CohostPanel({ streamId, isHost, onChanged }: { streamId: number;
         </SheetHeader>
 
         <div className="flex-1 overflow-y-auto space-y-5 pt-3">
-          {isHost && (
+          {isHost && data && !isGroup && (
+            <div className="rounded-lg border border-primary/40 bg-primary/10 p-4 text-center space-y-3">
+              <div className="text-sm text-white font-semibold">This is a solo live stream.</div>
+              <p className="text-xs text-muted-foreground">Switch to group live to invite up to 15 co-hosts onto your camera grid. Plays games, do duets, host shows together.</p>
+              <Button onClick={enableGroup} disabled={enabling} className="w-full bg-primary text-black font-bold" data-testid="button-enable-group">
+                {enabling ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <UserPlus className="w-4 h-4 mr-2" />}
+                Enable group live
+              </Button>
+            </div>
+          )}
+
+          {isHost && isGroup && (
             <div className="rounded-lg border border-accent/30 bg-accent/10 p-3">
               <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Invite code</div>
               <div className="flex items-center gap-2">
@@ -166,7 +192,7 @@ export function CohostPanel({ streamId, isHost, onChanged }: { streamId: number;
             </div>
           )}
 
-          {!isHost && (
+          {!isHost && isGroup && (
             <div className="space-y-3">
               {myStatus === "approved" ? (
                 <div className="rounded-lg border border-green-500/40 bg-green-500/10 p-3 text-sm text-green-400">
@@ -200,7 +226,13 @@ export function CohostPanel({ streamId, isHost, onChanged }: { streamId: number;
             </div>
           )}
 
-          {isHost && (
+          {!isHost && !isGroup && data && (
+            <div className="rounded-lg border border-border bg-black/40 p-3 text-sm text-muted-foreground text-center">
+              This is a solo live stream — only the host can broadcast.
+            </div>
+          )}
+
+          {isHost && isGroup && (
             <div>
               <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2 flex items-center justify-between">
                 <span>Pending requests</span>
@@ -229,6 +261,7 @@ export function CohostPanel({ streamId, isHost, onChanged }: { streamId: number;
             </div>
           )}
 
+          {isGroup && (
           <div>
             <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2 flex items-center justify-between">
               <span>In the group</span>
@@ -251,6 +284,7 @@ export function CohostPanel({ streamId, isHost, onChanged }: { streamId: number;
               ))}
             </div>
           </div>
+          )}
 
           {loading && <div className="flex justify-center py-2"><Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /></div>}
         </div>

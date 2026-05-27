@@ -160,7 +160,7 @@ export function GroupRoomProvider({ streamId, children }: { streamId: number; ch
 }
 
 // --- Tile for a single publisher ---
-function ParticipantTile({ participant, isLocal }: { participant: Participant; isLocal: boolean }) {
+function ParticipantTile({ participant, isLocal, filterCss }: { participant: Participant; isLocal: boolean; filterCss?: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [hasVideo, setHasVideo] = useState(false);
@@ -208,7 +208,7 @@ function ParticipantTile({ participant, isLocal }: { participant: Participant; i
         playsInline
         muted={isLocal}
         className="w-full h-full object-cover"
-        style={isLocal ? { transform: "scaleX(-1)" } : undefined}
+        style={isLocal ? { transform: "scaleX(-1)", filter: filterCss || "none" } : undefined}
       />
       {!isLocal && <audio ref={audioRef} autoPlay />}
       {!hasVideo && (
@@ -229,7 +229,7 @@ function ParticipantTile({ participant, isLocal }: { participant: Participant; i
 }
 
 /** Grid stage: shows up to 15 publisher tiles + on-screen controls if local user is publishing */
-export function LiveKitGroupStage() {
+export function LiveKitGroupStage({ filterCss }: { filterCss?: string } = {}) {
   const { room, canPublish, participants } = useGroupRoom();
   const [camOn, setCamOn] = useState(true);
   const [micOn, setMicOn] = useState(true);
@@ -279,9 +279,12 @@ export function LiveKitGroupStage() {
           style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
           data-testid="group-grid"
         >
-          {sorted.slice(0, 15).map((p) => (
-            <ParticipantTile key={p.identity} participant={p} isLocal={p === room.localParticipant} />
-          ))}
+          {sorted.slice(0, 15).map((p) => {
+            const isLocal = p === room.localParticipant;
+            return (
+              <ParticipantTile key={p.identity} participant={p} isLocal={isLocal} filterCss={isLocal ? filterCss : undefined} />
+            );
+          })}
         </div>
       )}
       {canPublish && (
