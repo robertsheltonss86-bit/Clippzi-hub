@@ -94,8 +94,12 @@ export function CohostPanel({ streamId, isHost, onChanged }: { streamId: number;
     catch { /* noop */ }
   };
   const remove = async (uid: number) => {
-    try { await apiDelete(`/livestreams/${streamId}/cohosts/${uid}`); refresh(); }
-    catch { /* noop */ }
+    try {
+      await apiDelete(`/livestreams/${streamId}/cohosts/${uid}`);
+      // If I removed myself, reload so my client drops publish rights & rejoins as viewer
+      if (uid === userId) { window.location.reload(); return; }
+      refresh();
+    } catch { /* noop */ }
   };
 
   const request = async () => {

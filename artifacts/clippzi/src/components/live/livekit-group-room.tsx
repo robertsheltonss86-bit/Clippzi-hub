@@ -48,6 +48,11 @@ export function GroupRoomProvider({ streamId, children }: { streamId: number; ch
   const [canPublish, setCanPublish] = useState(false);
   const [isHost, setIsHost] = useState(false);
   const [isCohost, setIsCohost] = useState(false);
+  // Refs mirror the latest state for use inside the poll closure (effect deps are [streamId])
+  const canPublishRef = useRef(false);
+  const isHostRef = useRef(false);
+  useEffect(() => { canPublishRef.current = canPublish; }, [canPublish]);
+  useEffect(() => { isHostRef.current = isHost; }, [isHost]);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [error, setError] = useState("");
   const [status, setStatus] = useState<"idle" | "connecting" | "connected" | "error">("idle");
@@ -110,11 +115,13 @@ export function GroupRoomProvider({ streamId, children }: { streamId: number; ch
       }
     })();
 
-    // Poll cohost status: if we get approved while connected as viewer, reload
-    // so we re-mint a publisher token (works even if the cohost panel is closed).
+    // Poll cohort status: if we get approved while connected as viewer, reload
+    // so we re-mint a publisher token. Uses a guard flag (not state) to avoid
+    // a closure-stale reload loop after the upgrade succeeds.
     let pollId: ReturnType<typeof setInterval> | null = null;
+    let alreadyUpgraded = false;
     pollId = setInterval(async () => {
-      if (cancelled) return;
+      if (cancelled || alreadyUpgraded) return;
       try {
         const r = await fetch(`${import.meta.env.BASE_URL}api/livestreams/${streamId}/cohosts`, { credentials: "include" });
         if (!r.ok) return;
@@ -123,8 +130,10 @@ export function GroupRoomProvider({ streamId, children }: { streamId: number; ch
         const me = meReq && meReq.ok ? (await meReq.json())?.appUserId : null;
         if (!me) return;
         const mine = (d.approved || []).find((x: any) => x.userId === me);
-        // We started as viewer but are now approved cohost → upgrade
-        if (mine && !canPublish && !isHost) {
+        // Read the LATEST refs (effect deps are [streamId] so React state in
+        // closure is stale; refs are always current).
+        if (mine && !canPublishRef.current && !isHostRef.current) {
+          alreadyUpgraded = true;
           window.location.reload();
         }
       } catch { /* ignore */ }

@@ -4,7 +4,7 @@ import { livestreamsTable, usersTable, liveChatMessagesTable, livestreamCohostsT
 import { and } from "drizzle-orm";
 import { eq, sql, desc, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/authMiddleware";
-import { livekitConfigured, getLivekitUrl, mintLivekitToken } from "../lib/livekit";
+import { livekitConfigured, getLivekitUrl, mintLivekitToken, removeLivekitParticipant } from "../lib/livekit";
 import {
   ListLivestreamsQueryParams,
   StartLivestreamBody,
@@ -55,14 +55,16 @@ router.get("/livestreams", async (req, res) => {
 });
 
 // POST /livestreams
-router.post("/livestreams", async (req, res) => {
+router.post("/livestreams", requireAuth, async (req, res) => {
   try {
     const body = StartLivestreamBody.parse(req.body);
+    // Security: stream owner is always the authenticated user (ignore client-supplied userId)
+    const ownerId = req.user!.appUserId;
     const streamKey = `sk_${Math.random().toString(36).substring(2)}`;
     const mode = (req.body?.mode === "group") ? "group" : "solo";
     const inviteCode = mode === "group" ? genInviteCode() : null;
     const [stream] = await db.insert(livestreamsTable).values({
-      userId: body.userId,
+      userId: ownerId,
       title: body.title,
       description: body.description ?? null,
       thumbnailUrl: body.thumbnailUrl ?? null,
@@ -75,7 +77,7 @@ router.post("/livestreams", async (req, res) => {
       mode,
       inviteCode,
     }).returning();
-    await db.update(usersTable).set({ isLive: true }).where(eq(usersTable.id, body.userId));
+    await db.update(usersTable).set({ isLive: true }).where(eq(usersTable.id, ownerId));
     res.status(201).json(await enrichStream(stream));
   } catch (e) {
     res.status(400).json({ error: String(e) });
@@ -403,16 +405,12 @@ router.post("/livestreams/:id/cohosts/request", requireAuth, async (req, res) =>
     if (!stream) return res.status(404).json({ error: "Stream not found" });
     if (stream.mode !== "group") return res.status(400).json({ error: "Stream is not a group live" });
     if (stream.userId === me) return res.status(400).json({ error: "You are the host" });
-    const approvedCount = await db.select().from(livestreamCohostsTable)
-      .where(and(eq(livestreamCohostsTable.streamId, id), eq(livestreamCohostsTable.status, "approved")));
-    if (approvedCount.length >= stream.maxCohosts) return res.status(409).json({ error: "Group is full" });
-    // Upsert request as pending (unless already approved)
+    // Pending requests don't take a slot — only check capacity at approve/join-by-code
     const [existing] = await db.select().from(livestreamCohostsTable)
       .where(and(eq(livestreamCohostsTable.streamId, id), eq(livestreamCohostsTable.userId, me)));
     if (existing) {
       if (existing.status === "approved") return res.json({ status: "approved" });
       if (existing.status === "pending") return res.json({ status: "pending" });
-      // rejected -> retry
       await db.update(livestreamCohostsTable).set({ status: "pending" }).where(eq(livestreamCohostsTable.id, existing.id));
       return res.json({ status: "pending" });
     }
@@ -430,24 +428,31 @@ router.post("/livestreams/:id/cohosts/join-by-code", requireAuth, async (req, re
     const me = req.user!.appUserId;
     const code = String(req.body?.code || "").trim().toUpperCase();
     if (!code) return res.status(400).json({ error: "Code required" });
-    const [stream] = await db.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
-    if (!stream) return res.status(404).json({ error: "Stream not found" });
-    if (stream.mode !== "group") return res.status(400).json({ error: "Stream is not a group live" });
-    if (!stream.inviteCode || stream.inviteCode !== code) return res.status(403).json({ error: "Invalid code" });
-    if (stream.userId === me) return res.status(400).json({ error: "You are the host" });
-    const approvedCount = await db.select().from(livestreamCohostsTable)
-      .where(and(eq(livestreamCohostsTable.streamId, id), eq(livestreamCohostsTable.status, "approved")));
-    if (approvedCount.length >= stream.maxCohosts) return res.status(409).json({ error: "Group is full" });
-    const [existing] = await db.select().from(livestreamCohostsTable)
-      .where(and(eq(livestreamCohostsTable.streamId, id), eq(livestreamCohostsTable.userId, me)));
-    if (existing) {
-      if (existing.status !== "approved") {
-        await db.update(livestreamCohostsTable).set({ status: "approved" }).where(eq(livestreamCohostsTable.id, existing.id));
+    // Atomic capacity check + approve in a single transaction with row lock
+    const result = await db.transaction(async (tx) => {
+      const [stream] = await tx.execute(sql`
+        SELECT id, user_id AS "userId", mode, invite_code AS "inviteCode", max_cohosts AS "maxCohosts"
+        FROM livestreams WHERE id = ${id} FOR UPDATE
+      `).then((r: any) => (r.rows ?? r) as any[]);
+      if (!stream) return { code: 404, body: { error: "Stream not found" } };
+      if (stream.mode !== "group") return { code: 400, body: { error: "Stream is not a group live" } };
+      if (!stream.inviteCode || stream.inviteCode !== code) return { code: 403, body: { error: "Invalid code" } };
+      if (stream.userId === me) return { code: 400, body: { error: "You are the host" } };
+      const approved = await tx.select().from(livestreamCohostsTable)
+        .where(and(eq(livestreamCohostsTable.streamId, id), eq(livestreamCohostsTable.status, "approved")));
+      const [mine] = await tx.select().from(livestreamCohostsTable)
+        .where(and(eq(livestreamCohostsTable.streamId, id), eq(livestreamCohostsTable.userId, me)));
+      if (mine?.status === "approved") return { code: 200, body: { status: "approved" } };
+      if (approved.length >= stream.maxCohosts) return { code: 409, body: { error: "Group is full" } };
+      if (mine) {
+        await tx.update(livestreamCohostsTable).set({ status: "approved" })
+          .where(eq(livestreamCohostsTable.id, mine.id));
+      } else {
+        await tx.insert(livestreamCohostsTable).values({ streamId: id, userId: me, status: "approved" });
       }
-    } else {
-      await db.insert(livestreamCohostsTable).values({ streamId: id, userId: me, status: "approved" });
-    }
-    res.json({ status: "approved" });
+      return { code: 200, body: { status: "approved" } };
+    });
+    res.status(result.code).json(result.body);
   } catch (e) {
     res.status(400).json({ error: String(e) });
   }
@@ -459,15 +464,27 @@ router.post("/livestreams/:id/cohosts/:userId/approve", requireAuth, async (req,
     const id = Number(req.params.id);
     const targetUserId = Number(req.params.userId);
     const me = req.user!.appUserId;
-    const [stream] = await db.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
-    if (!stream) return res.status(404).json({ error: "Stream not found" });
-    if (stream.userId !== me) return res.status(403).json({ error: "Only host can approve" });
-    const approvedCount = await db.select().from(livestreamCohostsTable)
-      .where(and(eq(livestreamCohostsTable.streamId, id), eq(livestreamCohostsTable.status, "approved")));
-    if (approvedCount.length >= stream.maxCohosts) return res.status(409).json({ error: "Group is full" });
-    await db.update(livestreamCohostsTable).set({ status: "approved" })
-      .where(and(eq(livestreamCohostsTable.streamId, id), eq(livestreamCohostsTable.userId, targetUserId)));
-    res.json({ ok: true });
+    // Atomic: lock stream row, check capacity, set approved
+    const result = await db.transaction(async (tx) => {
+      const lockRows = await tx.execute(sql`
+        SELECT id, user_id AS "userId", max_cohosts AS "maxCohosts"
+        FROM livestreams WHERE id = ${id} FOR UPDATE
+      `).then((r: any) => (r.rows ?? r) as any[]);
+      const stream = lockRows[0];
+      if (!stream) return { code: 404, body: { error: "Stream not found" } };
+      if (stream.userId !== me) return { code: 403, body: { error: "Only host can approve" } };
+      const approved = await tx.select().from(livestreamCohostsTable)
+        .where(and(eq(livestreamCohostsTable.streamId, id), eq(livestreamCohostsTable.status, "approved")));
+      const [target] = await tx.select().from(livestreamCohostsTable)
+        .where(and(eq(livestreamCohostsTable.streamId, id), eq(livestreamCohostsTable.userId, targetUserId)));
+      if (target?.status === "approved") return { code: 200, body: { ok: true } };
+      if (approved.length >= stream.maxCohosts) return { code: 409, body: { error: "Group is full" } };
+      if (!target) return { code: 404, body: { error: "No request found" } };
+      await tx.update(livestreamCohostsTable).set({ status: "approved" })
+        .where(eq(livestreamCohostsTable.id, target.id));
+      return { code: 200, body: { ok: true } };
+    });
+    res.status(result.code).json(result.body);
   } catch (e) {
     res.status(400).json({ error: String(e) });
   }
@@ -501,6 +518,8 @@ router.delete("/livestreams/:id/cohosts/:userId", requireAuth, async (req, res) 
     if (stream.userId !== me && targetUserId !== me) return res.status(403).json({ error: "Forbidden" });
     await db.delete(livestreamCohostsTable)
       .where(and(eq(livestreamCohostsTable.streamId, id), eq(livestreamCohostsTable.userId, targetUserId)));
+    // Kick from LiveKit room so they immediately lose publish rights (token TTL is 2h)
+    await removeLivekitParticipant(`stream-${id}`, `cohost-${id}-${targetUserId}`);
     res.json({ ok: true });
   } catch (e) {
     res.status(400).json({ error: String(e) });

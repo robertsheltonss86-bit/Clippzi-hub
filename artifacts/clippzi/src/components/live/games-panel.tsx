@@ -118,12 +118,20 @@ function Hangman({ gameId, starterId }: { gameId: string; starterId: number }) {
   const isSetter = userId === setterId;
 
   const { send } = useRoomData(
-    useCallback((msg: any) => {
+    useCallback((msg: any, from: any) => {
       if (msg.id !== gameId) return;
-      if (msg.t === "hm.init") { setWord(msg.word.toUpperCase()); setSetterId(msg.setterId); setGuesses([]); }
-      else if (msg.t === "hm.guess") setGuesses((g) => g.includes(msg.letter) ? g : [...g, msg.letter]);
-      else if (msg.t === "hm.snapshot") { setWord(msg.word); setSetterId(msg.setterId); setGuesses(msg.guesses); }
-    }, [gameId]),
+      // Authoritative: only the game starter may set/snapshot the word
+      const senderId = from ? Number(from.identity.match(/-(\d+)$/)?.[1]) : userId;
+      if (msg.t === "hm.init") {
+        if (senderId !== starterId) return;
+        setWord(msg.word.toUpperCase()); setSetterId(msg.setterId); setGuesses([]);
+      } else if (msg.t === "hm.guess") {
+        setGuesses((g) => g.includes(msg.letter) ? g : [...g, msg.letter]);
+      } else if (msg.t === "hm.snapshot") {
+        if (senderId !== starterId) return;
+        setWord(msg.word); setSetterId(msg.setterId); setGuesses(msg.guesses);
+      }
+    }, [gameId, starterId, userId]),
   );
 
   useRebroadcastOnJoin(isStarter && word ? { t: "hm.snapshot", id: gameId, word, setterId, guesses } : null);
