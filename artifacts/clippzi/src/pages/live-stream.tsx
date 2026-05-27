@@ -225,6 +225,8 @@ export default function LiveStream() {
     }
   };
 
+  const [chatOpen, setChatOpen] = useState(false);
+
   if (streamLoading) {
     return <div className="h-full w-full flex items-center justify-center bg-black"><Skeleton className="w-full h-full" /></div>;
   }
@@ -232,7 +234,6 @@ export default function LiveStream() {
   const otherStreams = allStreams?.filter((s) => s.id !== streamId && s.status === "live") ?? [];
   const isOwnStream = !!CURRENT_USER_ID && stream?.userId === CURRENT_USER_ID;
   const isGroup = (stream as any)?.mode === "group";
-  const [chatOpen, setChatOpen] = useState(false);
 
   return (
     <div className="flex flex-col lg:flex-row h-full w-full bg-black overflow-hidden relative">
