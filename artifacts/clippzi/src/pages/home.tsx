@@ -1,5 +1,6 @@
 import { useGetFeed, getGetFeedQueryKey, useListLivestreams, useLikePost, useSharePost } from "@workspace/api-client-react";
 import { Heart, MessageCircle, Share2, Play } from "lucide-react";
+import { CommentsSheet } from "@/components/comments-sheet";
 import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
@@ -139,12 +140,14 @@ export default function Home() {
                 <span className="text-sm font-semibold text-white drop-shadow-md">{likeCount}</span>
               </button>
 
-              <button className="flex flex-col items-center gap-1 group">
-                <div className="w-12 h-12 rounded-full bg-black/40 flex items-center justify-center group-hover:bg-black/60 transition-colors">
-                  <MessageCircle className="w-7 h-7 text-white group-hover:scale-110 transition-all duration-300" />
-                </div>
-                <span className="text-sm font-semibold text-white drop-shadow-md">{post.commentCount}</span>
-              </button>
+              <CommentsSheet postId={post.id} count={post.commentCount ?? 0}>
+                <button className="flex flex-col items-center gap-1 group" data-testid={`button-comments-${post.id}`}>
+                  <div className="w-12 h-12 rounded-full bg-black/40 flex items-center justify-center group-hover:bg-black/60 transition-colors">
+                    <MessageCircle className="w-7 h-7 text-white group-hover:scale-110 transition-all duration-300" />
+                  </div>
+                  <span className="text-sm font-semibold text-white drop-shadow-md">{post.commentCount}</span>
+                </button>
+              </CommentsSheet>
 
               <button onClick={() => handleShare(post.id)} className="flex flex-col items-center gap-1 group" data-testid={`button-share-${post.id}`}>
                 <div className="w-12 h-12 rounded-full bg-black/40 flex items-center justify-center group-hover:bg-black/60 transition-colors">

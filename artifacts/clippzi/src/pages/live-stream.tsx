@@ -471,25 +471,40 @@ export default function LiveStream() {
           )}
 
           {!battleActive && isOwnStream && (
-            <div className="pointer-events-auto self-start flex flex-col gap-2">
-              <div className="flex items-center gap-2 mb-2 bg-black/40 backdrop-blur px-3 py-1.5 rounded-full w-fit">
-                <Filter className="w-4 h-4 text-accent" />
-                <span className="text-xs text-white font-medium">Filters</span>
-              </div>
-              <div className="flex flex-col gap-2">
-                {filters.map((f) => (
+            <div className="pointer-events-auto self-start">
+              <Sheet>
+                <SheetTrigger asChild>
                   <button
-                    key={f}
-                    onClick={() => setActiveFilter(f)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
-                      activeFilter === f ? "bg-accent text-black scale-110 origin-left" : "bg-black/40 text-white border border-white/10 hover:bg-black/60"
-                    }`}
-                    data-testid={`button-filter-${f.toLowerCase()}`}
+                    className="flex items-center gap-2 bg-black/60 backdrop-blur px-3 py-2 rounded-full border border-white/10 hover:bg-black/80 transition-colors"
+                    data-testid="button-open-filters"
                   >
-                    {f}
+                    <Filter className="w-4 h-4 text-accent" />
+                    <span className="text-xs text-white font-bold">{activeFilter === "None" ? "Filters" : activeFilter}</span>
                   </button>
-                ))}
-              </div>
+                </SheetTrigger>
+                <SheetContent side="bottom" className="bg-card border-border h-auto max-h-[60vh]">
+                  <SheetHeader>
+                    <SheetTitle className="text-white flex items-center gap-2"><Filter className="w-5 h-5 text-accent" /> Face Filters</SheetTitle>
+                  </SheetHeader>
+                  <p className="text-xs text-muted-foreground mt-1 mb-4">Only you see the filter while testing — viewers see your raw camera. Tap one to preview.</p>
+                  <div className="grid grid-cols-3 gap-2 pb-4">
+                    {filters.map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setActiveFilter(f)}
+                        className={`px-3 py-3 rounded-xl text-sm font-bold transition-all border-2 ${
+                          activeFilter === f
+                            ? "bg-accent text-black border-accent scale-[1.03]"
+                            : "bg-black/40 text-white border-white/10 hover:bg-black/60"
+                        }`}
+                        data-testid={`button-filter-${f.toLowerCase().replace("&", "and")}`}
+                      >
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+                </SheetContent>
+              </Sheet>
             </div>
           )}
         </div>
