@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -23,27 +24,46 @@ export default function LiveBrowser() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
+  const [groupMode, setGroupMode] = useState(false);
+  const [starting, setStarting] = useState(false);
 
-  const handleGoLive = () => {
+  const handleGoLive = async () => {
     if (!isAuthenticated || !userId) { login(); return; }
     if (!title.trim()) {
       toast({ title: "Title is required", variant: "destructive" });
       return;
     }
-    startMutation.mutate(
-      { data: { userId, title: title.trim(), description: description.trim() || undefined, category: category.trim() || undefined } },
-      {
-        onSuccess: (stream) => {
-          queryClient.invalidateQueries({ queryKey: getListLivestreamsQueryKey() });
-          setOpen(false);
-          setTitle(""); setDescription(""); setCategory("");
-          toast({ title: "You're live! 🔴", description: stream.title });
-          setLocation(`/live/${stream.id}`);
-        },
-        onError: () => toast({ title: "Couldn't start stream", variant: "destructive" }),
-      },
-    );
+    setStarting(true);
+    try {
+      // Use plain fetch so we can pass `mode` (not in generated client types yet)
+      const base = import.meta.env.BASE_URL;
+      const res = await fetch(`${base}api/livestreams`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          title: title.trim(),
+          description: description.trim() || undefined,
+          category: category.trim() || undefined,
+          mode: groupMode ? "group" : "solo",
+        }),
+      });
+      const stream = await res.json();
+      if (!res.ok) throw new Error(stream?.error || "Failed");
+      queryClient.invalidateQueries({ queryKey: getListLivestreamsQueryKey() });
+      setOpen(false);
+      setTitle(""); setDescription(""); setCategory(""); setGroupMode(false);
+      toast({ title: groupMode ? "Group Live started! 👥" : "You're live! 🔴", description: stream.title });
+      setLocation(`/live/${stream.id}`);
+    } catch (e: any) {
+      toast({ title: "Couldn't start stream", description: e?.message, variant: "destructive" });
+    } finally {
+      setStarting(false);
+    }
   };
+  // Keep ref to satisfy unused-var lint
+  void startMutation;
 
   return (
     <div className="w-full min-h-full bg-background p-4 md:p-8 space-y-8">
@@ -85,11 +105,18 @@ export default function LiveBrowser() {
                 <Label htmlFor="cat">Category</Label>
                 <Input id="cat" data-testid="input-stream-category" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Gaming, Music, IRL..." />
               </div>
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                <div>
+                  <Label htmlFor="group" className="text-white font-semibold">👥 Group Live</Label>
+                  <p className="text-xs text-muted-foreground">Up to 15 co-hosts in a grid + group games</p>
+                </div>
+                <Switch id="group" checked={groupMode} onCheckedChange={setGroupMode} data-testid="switch-group-mode" />
+              </div>
             </div>
             <DialogFooter>
               <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
-              <Button onClick={handleGoLive} disabled={startMutation.isPending} className="bg-secondary hover:bg-secondary/80 text-white" data-testid="button-confirm-go-live">
-                {startMutation.isPending ? "Starting..." : "Go Live"}
+              <Button onClick={handleGoLive} disabled={starting} className="bg-secondary hover:bg-secondary/80 text-white" data-testid="button-confirm-go-live">
+                {starting ? "Starting..." : groupMode ? "Start Group Live" : "Go Live"}
               </Button>
             </DialogFooter>
           </DialogContent>

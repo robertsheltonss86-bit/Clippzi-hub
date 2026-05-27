@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { livestreamsTable, usersTable, liveChatMessagesTable } from "@workspace/db";
+import { livestreamsTable, usersTable, liveChatMessagesTable, livestreamCohostsTable } from "@workspace/db";
+import { and } from "drizzle-orm";
 import { eq, sql, desc, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/authMiddleware";
 import { livekitConfigured, getLivekitUrl, mintLivekitToken } from "../lib/livekit";
@@ -31,6 +32,14 @@ async function enrichStream(stream: typeof livestreamsTable.$inferSelect) {
   };
 }
 
+function genInviteCode(): string {
+  // Friendly 6-char code, no confusing chars
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let s = "";
+  for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
+
 // GET /livestreams
 router.get("/livestreams", async (req, res) => {
   try {
@@ -50,6 +59,8 @@ router.post("/livestreams", async (req, res) => {
   try {
     const body = StartLivestreamBody.parse(req.body);
     const streamKey = `sk_${Math.random().toString(36).substring(2)}`;
+    const mode = (req.body?.mode === "group") ? "group" : "solo";
+    const inviteCode = mode === "group" ? genInviteCode() : null;
     const [stream] = await db.insert(livestreamsTable).values({
       userId: body.userId,
       title: body.title,
@@ -61,6 +72,8 @@ router.post("/livestreams", async (req, res) => {
       status: "live",
       viewerCount: 0,
       startedAt: new Date(),
+      mode,
+      inviteCode,
     }).returning();
     await db.update(usersTable).set({ isLive: true }).where(eq(usersTable.id, body.userId));
     res.status(201).json(await enrichStream(stream));
@@ -315,25 +328,180 @@ router.post("/livestreams/:id/livekit-token", async (req, res) => {
     if (!stream) return res.status(404).json({ error: "Stream not found" });
     const me = req.user?.appUserId;
     const isHost = !!me && me === stream.userId;
-    if (req.body?.role === "publisher" && !isHost) {
-      return res.status(403).json({ error: "Only the host can publish to this stream" });
+    // Check approved cohost (group mode)
+    let isCohost = false;
+    if (!isHost && me && stream.mode === "group") {
+      const [cohost] = await db.select().from(livestreamCohostsTable)
+        .where(and(eq(livestreamCohostsTable.streamId, id), eq(livestreamCohostsTable.userId, me), eq(livestreamCohostsTable.status, "approved")));
+      isCohost = !!cohost;
+    }
+    const canPublish = isHost || isCohost;
+    if (req.body?.role === "publisher" && !canPublish) {
+      return res.status(403).json({ error: "Not authorized to publish to this stream" });
     }
     const rand = Math.random().toString(36).slice(2, 10);
-    // Role-encoded, collision-safe identity. Only the host gets a `host-` prefix.
+    // Role-encoded, collision-safe identity. Host: `host-`, cohost: `cohost-`.
     const identity = isHost
       ? `host-${id}-${me}`
-      : me
-        ? `viewer-${me}-${rand}`
-        : `guest-${rand}`;
+      : isCohost
+        ? `cohost-${id}-${me}`
+        : me
+          ? `viewer-${me}-${rand}`
+          : `guest-${rand}`;
     const [meUser] = me ? await db.select().from(usersTable).where(eq(usersTable.id, me)) : [null];
     const name = meUser?.displayName || meUser?.username || "Guest";
     const token = await mintLivekitToken({
       roomName: `stream-${id}`,
       identity,
       name,
-      canPublish: isHost,
+      canPublish,
     });
-    res.json({ token, url: getLivekitUrl(), isHost, identity });
+    res.json({ token, url: getLivekitUrl(), isHost, isCohost, identity });
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+// ===== Co-host (group live) endpoints =====
+
+// GET /livestreams/:id/cohosts — list approved cohosts (+ pending if you're host)
+router.get("/livestreams/:id/cohosts", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+    const [stream] = await db.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
+    if (!stream) return res.status(404).json({ error: "Stream not found" });
+    const me = req.user?.appUserId;
+    const isHost = !!me && me === stream.userId;
+    const rows = await db.select().from(livestreamCohostsTable).where(eq(livestreamCohostsTable.streamId, id));
+    const userIds = rows.map(r => r.userId);
+    const users = userIds.length ? await db.select().from(usersTable).where(inArray(usersTable.id, userIds)) : [];
+    const userMap = new Map(users.map(u => [u.id, u]));
+    const enriched = rows.map(r => ({
+      ...r,
+      createdAt: r.createdAt.toISOString(),
+      user: userMap.get(r.userId) ? { ...userMap.get(r.userId)!, createdAt: userMap.get(r.userId)!.createdAt.toISOString() } : null,
+    }));
+    res.json({
+      mode: stream.mode,
+      maxCohosts: stream.maxCohosts,
+      inviteCode: isHost ? stream.inviteCode : null,
+      approved: enriched.filter(r => r.status === "approved"),
+      pending: isHost ? enriched.filter(r => r.status === "pending") : [],
+    });
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+// POST /livestreams/:id/cohosts/request — viewer asks to join
+router.post("/livestreams/:id/cohosts/request", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const me = req.user!.appUserId;
+    const [stream] = await db.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
+    if (!stream) return res.status(404).json({ error: "Stream not found" });
+    if (stream.mode !== "group") return res.status(400).json({ error: "Stream is not a group live" });
+    if (stream.userId === me) return res.status(400).json({ error: "You are the host" });
+    const approvedCount = await db.select().from(livestreamCohostsTable)
+      .where(and(eq(livestreamCohostsTable.streamId, id), eq(livestreamCohostsTable.status, "approved")));
+    if (approvedCount.length >= stream.maxCohosts) return res.status(409).json({ error: "Group is full" });
+    // Upsert request as pending (unless already approved)
+    const [existing] = await db.select().from(livestreamCohostsTable)
+      .where(and(eq(livestreamCohostsTable.streamId, id), eq(livestreamCohostsTable.userId, me)));
+    if (existing) {
+      if (existing.status === "approved") return res.json({ status: "approved" });
+      if (existing.status === "pending") return res.json({ status: "pending" });
+      // rejected -> retry
+      await db.update(livestreamCohostsTable).set({ status: "pending" }).where(eq(livestreamCohostsTable.id, existing.id));
+      return res.json({ status: "pending" });
+    }
+    await db.insert(livestreamCohostsTable).values({ streamId: id, userId: me, status: "pending" });
+    res.json({ status: "pending" });
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+// POST /livestreams/:id/cohosts/join-by-code — { code }
+router.post("/livestreams/:id/cohosts/join-by-code", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const me = req.user!.appUserId;
+    const code = String(req.body?.code || "").trim().toUpperCase();
+    if (!code) return res.status(400).json({ error: "Code required" });
+    const [stream] = await db.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
+    if (!stream) return res.status(404).json({ error: "Stream not found" });
+    if (stream.mode !== "group") return res.status(400).json({ error: "Stream is not a group live" });
+    if (!stream.inviteCode || stream.inviteCode !== code) return res.status(403).json({ error: "Invalid code" });
+    if (stream.userId === me) return res.status(400).json({ error: "You are the host" });
+    const approvedCount = await db.select().from(livestreamCohostsTable)
+      .where(and(eq(livestreamCohostsTable.streamId, id), eq(livestreamCohostsTable.status, "approved")));
+    if (approvedCount.length >= stream.maxCohosts) return res.status(409).json({ error: "Group is full" });
+    const [existing] = await db.select().from(livestreamCohostsTable)
+      .where(and(eq(livestreamCohostsTable.streamId, id), eq(livestreamCohostsTable.userId, me)));
+    if (existing) {
+      if (existing.status !== "approved") {
+        await db.update(livestreamCohostsTable).set({ status: "approved" }).where(eq(livestreamCohostsTable.id, existing.id));
+      }
+    } else {
+      await db.insert(livestreamCohostsTable).values({ streamId: id, userId: me, status: "approved" });
+    }
+    res.json({ status: "approved" });
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+// POST /livestreams/:id/cohosts/:userId/approve — host approves
+router.post("/livestreams/:id/cohosts/:userId/approve", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const targetUserId = Number(req.params.userId);
+    const me = req.user!.appUserId;
+    const [stream] = await db.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
+    if (!stream) return res.status(404).json({ error: "Stream not found" });
+    if (stream.userId !== me) return res.status(403).json({ error: "Only host can approve" });
+    const approvedCount = await db.select().from(livestreamCohostsTable)
+      .where(and(eq(livestreamCohostsTable.streamId, id), eq(livestreamCohostsTable.status, "approved")));
+    if (approvedCount.length >= stream.maxCohosts) return res.status(409).json({ error: "Group is full" });
+    await db.update(livestreamCohostsTable).set({ status: "approved" })
+      .where(and(eq(livestreamCohostsTable.streamId, id), eq(livestreamCohostsTable.userId, targetUserId)));
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+// POST /livestreams/:id/cohosts/:userId/reject — host rejects
+router.post("/livestreams/:id/cohosts/:userId/reject", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const targetUserId = Number(req.params.userId);
+    const me = req.user!.appUserId;
+    const [stream] = await db.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
+    if (!stream) return res.status(404).json({ error: "Stream not found" });
+    if (stream.userId !== me) return res.status(403).json({ error: "Only host can reject" });
+    await db.update(livestreamCohostsTable).set({ status: "rejected" })
+      .where(and(eq(livestreamCohostsTable.streamId, id), eq(livestreamCohostsTable.userId, targetUserId)));
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+// DELETE /livestreams/:id/cohosts/:userId — host removes OR self-leave
+router.delete("/livestreams/:id/cohosts/:userId", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const targetUserId = Number(req.params.userId);
+    const me = req.user!.appUserId;
+    const [stream] = await db.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
+    if (!stream) return res.status(404).json({ error: "Stream not found" });
+    if (stream.userId !== me && targetUserId !== me) return res.status(403).json({ error: "Forbidden" });
+    await db.delete(livestreamCohostsTable)
+      .where(and(eq(livestreamCohostsTable.streamId, id), eq(livestreamCohostsTable.userId, targetUserId)));
+    res.json({ ok: true });
   } catch (e) {
     res.status(400).json({ error: String(e) });
   }

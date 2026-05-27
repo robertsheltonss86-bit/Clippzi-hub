@@ -23,6 +23,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { LiveKitBroadcaster, LiveKitViewer } from "@/components/live/livekit-stage";
+import { GroupRoomProvider, LiveKitGroupStage } from "@/components/live/livekit-group-room";
+import { CohostPanel } from "@/components/live/cohost-panel";
+import { GamesPanel } from "@/components/live/games-panel";
 
 function formatCount(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -228,6 +231,7 @@ export default function LiveStream() {
 
   const otherStreams = allStreams?.filter((s) => s.id !== streamId && s.status === "live") ?? [];
   const isOwnStream = !!CURRENT_USER_ID && stream?.userId === CURRENT_USER_ID;
+  const isGroup = (stream as any)?.mode === "group";
 
   return (
     <div className="flex flex-col lg:flex-row h-full w-full bg-black overflow-hidden relative">
@@ -249,6 +253,11 @@ export default function LiveStream() {
               </div>
             </div>
           </div>
+        ) : isGroup ? (
+          <GroupRoomProvider streamId={streamId}>
+            <LiveKitGroupStage />
+            <GamesPanel />
+          </GroupRoomProvider>
         ) : isOwnStream ? (
           <div className="absolute inset-0 bg-black">
             <LiveKitBroadcaster streamId={streamId} />
@@ -290,6 +299,7 @@ export default function LiveStream() {
               <Button onClick={handleShare} size="icon" variant="ghost" className="rounded-full bg-black/60 backdrop-blur border border-white/10 h-8 w-8 text-white hover:bg-black/80" data-testid="button-share-stream">
                 <Share2 className="w-4 h-4" />
               </Button>
+              {isGroup && <CohostPanel streamId={streamId} isHost={isOwnStream} />}
               {battleActive ? (
                 <Button onClick={handleEndBattle} size="sm" className="rounded-full bg-red-600 hover:bg-red-700 text-white h-8 px-3 text-xs gap-1" data-testid="button-end-battle">
                   <Swords className="w-3.5 h-3.5" /> End Battle

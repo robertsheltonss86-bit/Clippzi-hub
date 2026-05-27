@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 import { usersTable } from "./users";
 
 export const streamStatusEnum = pgEnum("stream_status", ["live", "ended", "scheduled"]);
+export const cohostStatusEnum = pgEnum("cohost_status", ["pending", "approved", "rejected"]);
 
 export const livestreamsTable = pgTable("livestreams", {
   id: serial("id").primaryKey(),
@@ -26,6 +27,9 @@ export const livestreamsTable = pgTable("livestreams", {
   battleOpponentScore: numeric("battle_opponent_score", { precision: 10, scale: 2 }).notNull().default("0"),
   battleEndsAt: timestamp("battle_ends_at"),
   likeCount: integer("like_count").notNull().default(0),
+  mode: text("mode").notNull().default("solo"),
+  inviteCode: text("invite_code"),
+  maxCohosts: integer("max_cohosts").notNull().default(15),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -37,8 +41,17 @@ export const liveChatMessagesTable = pgTable("live_chat_messages", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const livestreamCohostsTable = pgTable("livestream_cohosts", {
+  id: serial("id").primaryKey(),
+  streamId: integer("stream_id").notNull().references(() => livestreamsTable.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => usersTable.id),
+  status: cohostStatusEnum("status").notNull().default("pending"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const insertLivestreamSchema = createInsertSchema(livestreamsTable).omit({ id: true, createdAt: true });
 
 export type InsertLivestream = z.infer<typeof insertLivestreamSchema>;
 export type Livestream = typeof livestreamsTable.$inferSelect;
 export type LiveChatMessage = typeof liveChatMessagesTable.$inferSelect;
+export type LivestreamCohost = typeof livestreamCohostsTable.$inferSelect;
