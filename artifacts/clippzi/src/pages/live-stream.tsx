@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { CameraPreview } from "@/components/live/camera-preview";
 
 export default function LiveStream() {
   const { userId: CURRENT_USER_ID, isAuthenticated, login } = useCurrentUser();
@@ -121,6 +122,7 @@ export default function LiveStream() {
   }
 
   const otherStreams = allStreams?.filter((s) => s.id !== streamId && s.status === "live") ?? [];
+  const isOwnStream = !!CURRENT_USER_ID && stream?.userId === CURRENT_USER_ID;
 
   return (
     <div className="flex flex-col lg:flex-row h-full w-full bg-black overflow-hidden relative">
@@ -141,6 +143,10 @@ export default function LiveStream() {
                 <img src={opponent?.user?.avatarUrl || "/assets/avatar2.png"} alt="" className="w-7 h-7 rounded-full" />
               </div>
             </div>
+          </div>
+        ) : isOwnStream ? (
+          <div className="absolute inset-0 bg-black">
+            <CameraPreview />
           </div>
         ) : (
           <div className="absolute inset-0 bg-zinc-900 flex items-center justify-center">
