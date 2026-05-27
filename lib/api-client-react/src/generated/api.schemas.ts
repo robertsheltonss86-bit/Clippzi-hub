@@ -376,7 +376,25 @@ export interface Livestream {
   battleOpponentScore?: number;
   /** @nullable */
   battleEndsAt?: string | null;
+  likeCount?: number;
   createdAt: string;
+}
+
+export interface LiveChatMessage {
+  id: number;
+  streamId: number;
+  userId: number;
+  user?: User;
+  message: string;
+  createdAt: string;
+}
+
+export interface LiveChatInput {
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  message: string;
 }
 
 export interface LivestreamInput {

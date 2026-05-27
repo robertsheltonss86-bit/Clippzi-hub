@@ -47,7 +47,7 @@ export default function LiveBrowser() {
 
   return (
     <div className="w-full min-h-full bg-background p-4 md:p-8 space-y-8">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+      <div className="flex items-center justify-between gap-3 flex-wrap sticky top-0 z-30 bg-background/95 backdrop-blur -mx-4 md:-mx-8 px-4 md:px-8 py-3 border-b border-border">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-xl bg-secondary/10 flex items-center justify-center border border-secondary/20">
             <Radio className="w-6 h-6 text-secondary animate-pulse" />
@@ -59,7 +59,11 @@ export default function LiveBrowser() {
         </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button size="lg" className="bg-secondary hover:bg-secondary/80 text-white font-bold gap-2" data-testid="button-go-live">
+            <Button
+              size="lg"
+              className="bg-secondary hover:bg-secondary/80 text-white font-extrabold gap-2 rounded-full shadow-[0_0_20px_rgba(244,63,94,0.45)] animate-pulse"
+              data-testid="button-go-live"
+            >
               <Video className="w-5 h-5" /> Go Live
             </Button>
           </DialogTrigger>

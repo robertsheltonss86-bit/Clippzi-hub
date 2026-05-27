@@ -25,6 +25,15 @@ export const livestreamsTable = pgTable("livestreams", {
   battleScore: numeric("battle_score", { precision: 10, scale: 2 }).notNull().default("0"),
   battleOpponentScore: numeric("battle_opponent_score", { precision: 10, scale: 2 }).notNull().default("0"),
   battleEndsAt: timestamp("battle_ends_at"),
+  likeCount: integer("like_count").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const liveChatMessagesTable = pgTable("live_chat_messages", {
+  id: serial("id").primaryKey(),
+  streamId: integer("stream_id").notNull().references(() => livestreamsTable.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => usersTable.id),
+  message: text("message").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -32,3 +41,4 @@ export const insertLivestreamSchema = createInsertSchema(livestreamsTable).omit(
 
 export type InsertLivestream = z.infer<typeof insertLivestreamSchema>;
 export type Livestream = typeof livestreamsTable.$inferSelect;
+export type LiveChatMessage = typeof liveChatMessagesTable.$inferSelect;

@@ -50,6 +50,8 @@ export * from './listPostsType';
 export * from './listShopOrdersParams';
 export * from './listShopProductsParams';
 export * from './listUsersParams';
+export * from './liveChatInput';
+export * from './liveChatMessage';
 export * from './livestream';
 export * from './livestreamInput';
 export * from './livestreamStatus';

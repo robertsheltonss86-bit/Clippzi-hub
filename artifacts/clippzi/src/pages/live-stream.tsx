@@ -1,8 +1,20 @@
-import { useGetLivestream, getGetLivestreamQueryKey, useListGifts, getListGiftsQueryKey, useSendGift, useListLivestreams, useStartBattle, useEndBattle, useAddBattleScore } from "@workspace/api-client-react";
+import {
+  useGetLivestream,
+  getGetLivestreamQueryKey,
+  useListGifts,
+  getListGiftsQueryKey,
+  useListLivestreams,
+  useStartBattle,
+  useEndBattle,
+  useLikeLivestream,
+  useListLiveChat,
+  getListLiveChatQueryKey,
+  useSendLiveChat,
+} from "@workspace/api-client-react";
 import { useParams } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, Gift as GiftIcon, Heart, Send, Sparkles, Filter, Swords, Share2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -11,6 +23,26 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { CameraPreview } from "@/components/live/camera-preview";
+
+function formatCount(n: number) {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
+
+function colorForUser(id: number) {
+  const colors = [
+    "text-primary",
+    "text-accent",
+    "text-secondary",
+    "text-yellow-400",
+    "text-pink-400",
+    "text-cyan-300",
+    "text-orange-400",
+    "text-violet-300",
+  ];
+  return colors[Math.abs(id) % colors.length];
+}
 
 export default function LiveStream() {
   const { userId: CURRENT_USER_ID, isAuthenticated, login } = useCurrentUser();
@@ -24,21 +56,37 @@ export default function LiveStream() {
   });
   const { data: gifts } = useListGifts(undefined, { query: { queryKey: getListGiftsQueryKey() } });
   const { data: allStreams } = useListLivestreams();
+  const { data: chatMessages } = useListLiveChat(streamId, {
+    query: { enabled: !!streamId, queryKey: getListLiveChatQueryKey(streamId), refetchInterval: 2000 },
+  });
 
-  const sendGiftMutation = useSendGift();
   const startBattle = useStartBattle();
   const endBattle = useEndBattle();
-  const addBattleScore = useAddBattleScore();
+  const likeMutation = useLikeLivestream();
+  const sendChatMutation = useSendLiveChat();
 
   const [activeFilter, setActiveFilter] = useState("None");
   const [battleOpen, setBattleOpen] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const [chatInput, setChatInput] = useState("");
+  const [likeDelta, setLikeDelta] = useState(0);
+  const [hearts, setHearts] = useState<{ id: number; x: number; y: number }[]>([]);
+  const heartIdRef = useRef(0);
+  const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const filters = ["None", "Beauty", "Vintage", "Neon", "Blur", "Cartoon"];
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  // Auto-scroll chat to bottom when new messages arrive
+  useEffect(() => {
+    const el = chatScrollRef.current;
+    if (!el) return;
+    const target = el.querySelector("[data-chat-end]") as HTMLElement | null;
+    target?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [chatMessages?.length]);
 
   const opponent = useMemo(
     () => allStreams?.find((s) => s.id === stream?.battleOpponentId),
@@ -51,8 +99,28 @@ export default function LiveStream() {
   const oppScore = Number(stream?.battleOpponentScore ?? 0);
   const totalScore = myScore + oppScore;
   const myPct = totalScore > 0 ? Math.round((myScore / totalScore) * 100) : 50;
+  const totalLikes = Number(stream?.likeCount ?? 0) + likeDelta;
 
   const refreshStream = () => queryClient.invalidateQueries({ queryKey: getGetLivestreamQueryKey(streamId) });
+
+  // Tap-to-like: spawn floating heart + increment like (pointerdown handles touch + mouse)
+  const handleViewportTap = (e: React.PointerEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const newId = ++heartIdRef.current;
+    setHearts((prev) => [...prev, { id: newId, x, y }]);
+    window.setTimeout(() => setHearts((prev) => prev.filter((h) => h.id !== newId)), 1400);
+
+    setLikeDelta((d) => d + 1);
+    likeMutation.mutate({ id: streamId }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetLivestreamQueryKey(streamId) });
+        setLikeDelta((d) => Math.max(0, d - 1));
+      },
+      onError: () => setLikeDelta((d) => Math.max(0, d - 1)),
+    });
+  };
 
   const handleSendGift = async (giftId: number, name: string, price: number) => {
     if (!isAuthenticated || !CURRENT_USER_ID) { login(); return; }
@@ -77,13 +145,32 @@ export default function LiveStream() {
     }
   };
 
+  const handleSendChat = () => {
+    const msg = chatInput.trim();
+    if (!msg) return;
+    if (!isAuthenticated || !CURRENT_USER_ID) { login(); return; }
+    setChatInput("");
+    sendChatMutation.mutate(
+      { id: streamId, data: { message: msg } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListLiveChatQueryKey(streamId) });
+        },
+        onError: (err: any) => {
+          setChatInput(msg);
+          toast({ title: "Couldn't send", description: String(err?.message ?? err), variant: "destructive" });
+        },
+      },
+    );
+  };
+
   const handleStartBattle = (opponentStreamId: number) => {
     startBattle.mutate(
       { id: streamId, data: { opponentStreamId, durationSeconds: 180 } },
       {
         onSuccess: () => {
           setBattleOpen(false);
-          toast({ title: "⚔️ Battle started!", description: "3-minute gift battle is on. Gifts add to your score." });
+          toast({ title: "⚔️ Battle started!", description: "3-minute gift battle is on." });
           refreshStream();
         },
         onError: () => toast({ title: "Couldn't start battle", variant: "destructive" }),
@@ -102,9 +189,7 @@ export default function LiveStream() {
 
   const handleShare = async () => {
     const url = `${window.location.origin}${window.location.pathname}`;
-    if (navigator.clipboard) {
-      await navigator.clipboard.writeText(url).catch(() => {});
-    }
+    if (navigator.clipboard) await navigator.clipboard.writeText(url).catch(() => {});
     toast({ title: "Stream link copied!", description: url });
   };
 
@@ -157,7 +242,23 @@ export default function LiveStream() {
           </div>
         )}
 
-        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-transparent to-black/80 pointer-events-none flex flex-col justify-between p-4">
+        {/* Tap-to-like layer (sits between media and UI; UI re-enables pointer events) */}
+        <div
+          className="absolute inset-0 z-10 select-none touch-manipulation"
+          onPointerDown={handleViewportTap}
+          data-testid="tap-to-like"
+          aria-label="Tap to like"
+        >
+          {hearts.map((h) => (
+            <Heart
+              key={h.id}
+              className="absolute w-10 h-10 text-secondary fill-secondary pointer-events-none drop-shadow-[0_0_8px_rgba(244,63,94,0.8)] animate-[float-up_1.4s_ease-out_forwards]"
+              style={{ left: h.x - 20, top: h.y - 20 }}
+            />
+          ))}
+        </div>
+
+        <div className="absolute inset-0 z-20 bg-gradient-to-b from-black/80 via-transparent to-black/80 pointer-events-none flex flex-col justify-between p-4">
           <div className="flex justify-between items-start pointer-events-auto">
             <div className="flex items-center gap-3 bg-black/40 backdrop-blur p-2 rounded-full border border-white/10">
               <img src={stream?.user?.avatarUrl || "/assets/avatar1.png"} alt="" className="w-10 h-10 rounded-full object-cover" />
@@ -168,7 +269,7 @@ export default function LiveStream() {
               <Button size="sm" className="rounded-full bg-secondary hover:bg-secondary/80 text-white h-7 px-3 text-xs ml-2">Follow</Button>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap justify-end">
               <Button onClick={handleShare} size="icon" variant="ghost" className="rounded-full bg-black/60 backdrop-blur border border-white/10 h-8 w-8 text-white hover:bg-black/80" data-testid="button-share-stream">
                 <Share2 className="w-4 h-4" />
               </Button>
@@ -184,6 +285,10 @@ export default function LiveStream() {
               <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur px-3 py-1.5 rounded-full border border-white/10 text-white font-medium text-sm">
                 <Users className="w-4 h-4 text-primary" />
                 {stream?.viewerCount}
+              </div>
+              <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur px-3 py-1.5 rounded-full border border-secondary/40 text-white font-medium text-sm" data-testid="text-like-count">
+                <Heart className="w-4 h-4 text-secondary fill-secondary" />
+                {formatCount(totalLikes)}
               </div>
               <div className="px-3 py-1.5 rounded-full bg-secondary text-white text-xs font-bold uppercase tracking-wider animate-pulse">Live</div>
             </div>
@@ -228,40 +333,54 @@ export default function LiveStream() {
         </div>
       </div>
 
-      <div className="w-full lg:w-[400px] h-[50vh] lg:h-full flex flex-col bg-card border-l border-border relative z-10">
+      <div className="w-full lg:w-[400px] h-[50vh] lg:h-full flex flex-col bg-card border-l border-border relative z-30">
         <div className="p-3 border-b border-border bg-black/20 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-semibold text-primary">
-            <Sparkles className="w-4 h-4" /> Top Gifters
+            <Sparkles className="w-4 h-4" /> Live Chat
           </div>
-          <div className="flex -space-x-2">
-            {[1, 2, 3].map((i) => (
-              <img key={i} src={`/assets/avatar${i}.png`} alt="" className="w-6 h-6 rounded-full border border-black z-10" />
-            ))}
+          <div className="text-xs text-muted-foreground" data-testid="text-chat-count">
+            {chatMessages?.length ?? 0} message{(chatMessages?.length ?? 0) === 1 ? "" : "s"}
           </div>
         </div>
 
-        <ScrollArea className="flex-1 p-4">
-          <div className="space-y-4">
-            <div className="flex items-start gap-2">
-              <span className="font-bold text-accent text-sm">System:</span>
-              <span className="text-sm text-white/90">Welcome to the chat! Please be respectful.</span>
+        <div ref={chatScrollRef} className="flex-1 overflow-y-auto">
+          <div className="p-4 space-y-3" data-testid="list-chat-messages">
+            <div className="flex items-start gap-2 text-xs text-muted-foreground border-l-2 border-accent/40 pl-2">
+              Welcome to the chat — keep it kind. 💚
             </div>
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="flex items-start gap-2">
-                <img src={`/assets/avatar${(i % 3) + 1}.png`} alt="" className="w-6 h-6 rounded-full" />
-                <div>
-                  <span className="font-bold text-white text-sm mr-2">User{i}</span>
-                  <span className="text-sm text-white/80">This is so cool! 🔥</span>
-                </div>
+            {(!chatMessages || chatMessages.length === 0) ? (
+              <div className="text-center text-sm text-muted-foreground py-8">
+                Be the first to say hi 👋
               </div>
-            ))}
+            ) : (
+              chatMessages.map((m) => {
+                const name = m.user?.displayName || m.user?.username || `User${m.userId}`;
+                const isMe = m.userId === CURRENT_USER_ID;
+                return (
+                  <div key={m.id} className="flex items-start gap-2" data-testid={`chat-message-${m.id}`}>
+                    <img
+                      src={m.user?.avatarUrl || `/assets/avatar${(m.userId % 3) + 1}.png`}
+                      alt=""
+                      className="w-7 h-7 rounded-full object-cover shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className={`font-bold text-sm mr-2 ${isMe ? "text-primary" : colorForUser(m.userId)}`}>
+                        {name}{isMe ? " (you)" : ""}
+                      </span>
+                      <span className="text-sm text-white/90 break-words">{m.message}</span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            <div data-chat-end />
           </div>
-        </ScrollArea>
+        </div>
 
-        <div className="h-48 border-t border-border bg-black/40 p-2 flex flex-col gap-2">
+        <div className="h-44 border-t border-border bg-black/40 p-2 flex flex-col gap-2">
           <div className="flex items-center justify-between px-2 text-xs font-semibold text-muted-foreground uppercase">
             <span>Send Gifts {battleActive ? "(adds to battle score)" : ""}</span>
-            <span className="text-primary flex items-center gap-1"><GiftIcon className="w-3 h-3" /> 1,240 Coins</span>
+            <span className="text-primary flex items-center gap-1"><GiftIcon className="w-3 h-3" /> 60/40 split</span>
           </div>
           <ScrollArea className="flex-1">
             <div className="grid grid-cols-4 gap-2 pb-2">
@@ -281,17 +400,33 @@ export default function LiveStream() {
           </ScrollArea>
         </div>
 
-        <div className="p-3 border-t border-border bg-card flex gap-2 items-center">
+        <form
+          onSubmit={(e) => { e.preventDefault(); handleSendChat(); }}
+          className="p-3 border-t border-border bg-card flex gap-2 items-center"
+        >
           <div className="relative flex-1">
-            <Input placeholder="Say something..." className="bg-input border-none rounded-full pr-10" />
+            <Input
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              placeholder={isAuthenticated ? "Say something..." : "Log in to chat"}
+              maxLength={500}
+              className="bg-input border-none rounded-full pr-10"
+              data-testid="input-chat-message"
+            />
             <div className="absolute right-3 top-1/2 -translate-y-1/2">
               <Heart className="w-4 h-4 text-muted-foreground" />
             </div>
           </div>
-          <Button size="icon" className="rounded-full bg-primary hover:bg-primary/80 shrink-0">
+          <Button
+            type="submit"
+            size="icon"
+            disabled={sendChatMutation.isPending || !chatInput.trim()}
+            className="rounded-full bg-primary hover:bg-primary/80 shrink-0 disabled:opacity-50"
+            data-testid="button-send-chat"
+          >
             <Send className="w-4 h-4 text-black" />
           </Button>
-        </div>
+        </form>
       </div>
 
       <Dialog open={battleOpen} onOpenChange={setBattleOpen}>

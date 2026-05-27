@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { livestreamsTable, usersTable } from "@workspace/db";
+import { livestreamsTable, usersTable, liveChatMessagesTable } from "@workspace/db";
 import { eq, sql, desc } from "drizzle-orm";
+import { requireAuth } from "../middlewares/authMiddleware";
 import {
   ListLivestreamsQueryParams,
   StartLivestreamBody,
@@ -18,6 +19,7 @@ async function enrichStream(stream: typeof livestreamsTable.$inferSelect) {
   return {
     ...stream,
     totalGiftsReceived: Number(stream.totalGiftsReceived),
+    likeCount: Number(stream.likeCount ?? 0),
     battleScore: Number(stream.battleScore),
     battleOpponentScore: Number(stream.battleOpponentScore),
     user: user ? { ...user, createdAt: user.createdAt.toISOString() } : null,
@@ -191,6 +193,110 @@ router.post("/livestreams/:id/battle/score", async (req, res) => {
     });
     if ("error" in result) return res.status(result.status).json({ error: result.error });
     res.json(await enrichStream(result.stream));
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+// Simple in-memory token-bucket rate limiter (per key)
+const rateBuckets = new Map<string, { tokens: number; last: number }>();
+function rateLimit(key: string, capacity: number, refillPerSec: number): boolean {
+  const now = Date.now();
+  const b = rateBuckets.get(key) ?? { tokens: capacity, last: now };
+  const elapsed = (now - b.last) / 1000;
+  b.tokens = Math.min(capacity, b.tokens + elapsed * refillPerSec);
+  b.last = now;
+  if (b.tokens < 1) { rateBuckets.set(key, b); return false; }
+  b.tokens -= 1;
+  rateBuckets.set(key, b);
+  return true;
+}
+function clientKey(req: any): string {
+  return String(req.user?.appUserId ?? req.ip ?? "anon");
+}
+
+// POST /livestreams/:id/like — tap-to-like (rate limited)
+router.post("/livestreams/:id/like", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+    // Allow bursts of 10 taps, sustained 5/sec per client+stream
+    if (!rateLimit(`like:${clientKey(req)}:${id}`, 10, 5)) {
+      return res.status(429).json({ error: "Slow down" });
+    }
+    const [stream] = await db.update(livestreamsTable)
+      .set({ likeCount: sql`${livestreamsTable.likeCount} + 1` })
+      .where(eq(livestreamsTable.id, id))
+      .returning();
+    if (!stream) return res.status(404).json({ error: "Stream not found" });
+    res.json(await enrichStream(stream));
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+// GET /livestreams/:id/chat
+router.get("/livestreams/:id/chat", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+    const rows = await db.select().from(liveChatMessagesTable)
+      .where(eq(liveChatMessagesTable.streamId, id))
+      .orderBy(desc(liveChatMessagesTable.id))
+      .limit(limit);
+    const userIds = Array.from(new Set(rows.map((r) => r.userId)));
+    const users = userIds.length
+      ? await db.select().from(usersTable).where(sql`${usersTable.id} = ANY(${userIds})`)
+      : [];
+    const userMap = new Map(users.map((u) => [u.id, { ...u, createdAt: u.createdAt.toISOString() }]));
+    const messages = rows
+      .slice()
+      .reverse()
+      .map((m) => ({
+        id: m.id,
+        streamId: m.streamId,
+        userId: m.userId,
+        user: userMap.get(m.userId) ?? null,
+        message: m.message,
+        createdAt: m.createdAt.toISOString(),
+      }));
+    res.json(messages);
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+// POST /livestreams/:id/chat
+router.post("/livestreams/:id/chat", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+    const userId = req.user?.appUserId;
+    if (!userId) return res.status(401).json({ error: "Login required" });
+    // Chat: burst 5, sustained 1/sec per user+stream
+    if (!rateLimit(`chat:${userId}:${id}`, 5, 1)) {
+      return res.status(429).json({ error: "Slow down — too many messages" });
+    }
+    const raw = typeof req.body?.message === "string" ? req.body.message.trim() : "";
+    if (!raw) return res.status(400).json({ error: "Message required" });
+    if (raw.length > 500) return res.status(400).json({ error: "Message too long" });
+    const [stream] = await db.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
+    if (!stream) return res.status(404).json({ error: "Stream not found" });
+    const [msg] = await db.insert(liveChatMessagesTable).values({
+      streamId: id,
+      userId,
+      message: raw,
+    }).returning();
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+    res.status(201).json({
+      id: msg.id,
+      streamId: msg.streamId,
+      userId: msg.userId,
+      user: user ? { ...user, createdAt: user.createdAt.toISOString() } : null,
+      message: msg.message,
+      createdAt: msg.createdAt.toISOString(),
+    });
   } catch (e) {
     res.status(400).json({ error: String(e) });
   }

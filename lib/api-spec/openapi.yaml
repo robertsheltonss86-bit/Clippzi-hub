@@ -822,6 +822,69 @@ paths:
               schema:
                 $ref: "#/components/schemas/Livestream"
 
+  /livestreams/{id}/like:
+    post:
+      operationId: likeLivestream
+      tags: [livestreams]
+      summary: Tap-to-like a live stream (adds 1 like)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Livestream"
+
+  /livestreams/{id}/chat:
+    get:
+      operationId: listLiveChat
+      tags: [livestreams]
+      summary: Get recent chat messages for a stream
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LiveChatMessage"
+    post:
+      operationId: sendLiveChat
+      tags: [livestreams]
+      summary: Send a chat message to a live stream
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LiveChatInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiveChatMessage"
+
   /livestreams/{id}/battle:
     post:
       operationId: startBattle
@@ -1732,7 +1795,25 @@ components:
         battleScore: { type: number }
         battleOpponentScore: { type: number }
         battleEndsAt: { type: ["string", "null"] }
+        likeCount: { type: integer }
         createdAt: { type: string }
+
+    LiveChatMessage:
+      type: object
+      required: [id, streamId, userId, message, createdAt]
+      properties:
+        id: { type: integer }
+        streamId: { type: integer }
+        userId: { type: integer }
+        user: { $ref: "#/components/schemas/User" }
+        message: { type: string }
+        createdAt: { type: string }
+
+    LiveChatInput:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string, minLength: 1, maxLength: 500 }
 
     LivestreamInput:
       type: object

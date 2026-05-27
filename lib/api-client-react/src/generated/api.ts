@@ -56,6 +56,8 @@ import type {
   ListShopOrdersParams,
   ListShopProductsParams,
   ListUsersParams,
+  LiveChatInput,
+  LiveChatMessage,
   Livestream,
   LivestreamInput,
   LivestreamUpdate,
@@ -3212,6 +3214,225 @@ export const useUpdateLivestream = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateLivestreamMutationOptions(options));
+    }
+
+export const getLikeLivestreamUrl = (id: number,) => {
+
+
+
+
+  return `/api/livestreams/${id}/like`
+}
+
+/**
+ * @summary Tap-to-like a live stream (adds 1 like)
+ */
+export const likeLivestream = async (id: number, options?: RequestInit): Promise<Livestream> => {
+
+  return customFetch<Livestream>(getLikeLivestreamUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getLikeLivestreamMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof likeLivestream>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof likeLivestream>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['likeLivestream'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof likeLivestream>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  likeLivestream(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LikeLivestreamMutationResult = NonNullable<Awaited<ReturnType<typeof likeLivestream>>>
+
+    export type LikeLivestreamMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Tap-to-like a live stream (adds 1 like)
+ */
+export const useLikeLivestream = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof likeLivestream>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof likeLivestream>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getLikeLivestreamMutationOptions(options));
+    }
+
+export const getListLiveChatUrl = (id: number,) => {
+
+
+
+
+  return `/api/livestreams/${id}/chat`
+}
+
+/**
+ * @summary Get recent chat messages for a stream
+ */
+export const listLiveChat = async (id: number, options?: RequestInit): Promise<LiveChatMessage[]> => {
+
+  return customFetch<LiveChatMessage[]>(getListLiveChatUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListLiveChatQueryKey = (id: number,) => {
+    return [
+    `/api/livestreams/${id}/chat`
+    ] as const;
+    }
+
+
+export const getListLiveChatQueryOptions = <TData = Awaited<ReturnType<typeof listLiveChat>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listLiveChat>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListLiveChatQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listLiveChat>>> = ({ signal }) => listLiveChat(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listLiveChat>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListLiveChatQueryResult = NonNullable<Awaited<ReturnType<typeof listLiveChat>>>
+export type ListLiveChatQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get recent chat messages for a stream
+ */
+
+export function useListLiveChat<TData = Awaited<ReturnType<typeof listLiveChat>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listLiveChat>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListLiveChatQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getSendLiveChatUrl = (id: number,) => {
+
+
+
+
+  return `/api/livestreams/${id}/chat`
+}
+
+/**
+ * @summary Send a chat message to a live stream
+ */
+export const sendLiveChat = async (id: number,
+    liveChatInput: LiveChatInput, options?: RequestInit): Promise<LiveChatMessage> => {
+
+  return customFetch<LiveChatMessage>(getSendLiveChatUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      liveChatInput,)
+  }
+);}
+
+
+
+
+export const getSendLiveChatMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendLiveChat>>, TError,{id: number;data: BodyType<LiveChatInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendLiveChat>>, TError,{id: number;data: BodyType<LiveChatInput>}, TContext> => {
+
+const mutationKey = ['sendLiveChat'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendLiveChat>>, {id: number;data: BodyType<LiveChatInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  sendLiveChat(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendLiveChatMutationResult = NonNullable<Awaited<ReturnType<typeof sendLiveChat>>>
+    export type SendLiveChatMutationBody = BodyType<LiveChatInput>
+    export type SendLiveChatMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Send a chat message to a live stream
+ */
+export const useSendLiveChat = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendLiveChat>>, TError,{id: number;data: BodyType<LiveChatInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendLiveChat>>,
+        TError,
+        {id: number;data: BodyType<LiveChatInput>},
+        TContext
+      > => {
+      return useMutation(getSendLiveChatMutationOptions(options));
     }
 
 export const getStartBattleUrl = (id: number,) => {

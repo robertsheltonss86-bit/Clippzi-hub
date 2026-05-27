@@ -867,6 +867,7 @@ export const ListLivestreamsResponseItem = zod.object({
   "battleScore": zod.number().optional(),
   "battleOpponentScore": zod.number().optional(),
   "battleEndsAt": zod.string().nullish(),
+  "likeCount": zod.number().optional(),
   "createdAt": zod.string()
 })
 export const ListLivestreamsResponse = zod.array(ListLivestreamsResponseItem)
@@ -927,6 +928,7 @@ export const GetLivestreamResponse = zod.object({
   "battleScore": zod.number().optional(),
   "battleOpponentScore": zod.number().optional(),
   "battleEndsAt": zod.string().nullish(),
+  "likeCount": zod.number().optional(),
   "createdAt": zod.string()
 })
 
@@ -982,7 +984,105 @@ export const UpdateLivestreamResponse = zod.object({
   "battleScore": zod.number().optional(),
   "battleOpponentScore": zod.number().optional(),
   "battleEndsAt": zod.string().nullish(),
+  "likeCount": zod.number().optional(),
   "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Tap-to-like a live stream (adds 1 like)
+ */
+export const LikeLivestreamParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const LikeLivestreamResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "user": zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string(),
+  "bio": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "bannerUrl": zod.string().nullish(),
+  "isVerified": zod.boolean().optional(),
+  "isLive": zod.boolean().optional(),
+  "followerCount": zod.number().optional(),
+  "followingCount": zod.number().optional(),
+  "postCount": zod.number().optional(),
+  "totalViews": zod.number().optional(),
+  "role": zod.enum(['user', 'streamer', 'admin']).optional(),
+  "createdAt": zod.string()
+}).optional(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "thumbnailUrl": zod.string().nullish(),
+  "streamKey": zod.string().nullish(),
+  "playbackUrl": zod.string().nullish(),
+  "status": zod.enum(['live', 'ended', 'scheduled']),
+  "viewerCount": zod.number(),
+  "peakViewerCount": zod.number().optional(),
+  "totalGiftsReceived": zod.number().optional(),
+  "activeFilter": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "startedAt": zod.string().nullish(),
+  "endedAt": zod.string().nullish(),
+  "battleOpponentId": zod.number().nullish(),
+  "battleScore": zod.number().optional(),
+  "battleOpponentScore": zod.number().optional(),
+  "battleEndsAt": zod.string().nullish(),
+  "likeCount": zod.number().optional(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Get recent chat messages for a stream
+ */
+export const ListLiveChatParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ListLiveChatResponseItem = zod.object({
+  "id": zod.number(),
+  "streamId": zod.number(),
+  "userId": zod.number(),
+  "user": zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string(),
+  "bio": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "bannerUrl": zod.string().nullish(),
+  "isVerified": zod.boolean().optional(),
+  "isLive": zod.boolean().optional(),
+  "followerCount": zod.number().optional(),
+  "followingCount": zod.number().optional(),
+  "postCount": zod.number().optional(),
+  "totalViews": zod.number().optional(),
+  "role": zod.enum(['user', 'streamer', 'admin']).optional(),
+  "createdAt": zod.string()
+}).optional(),
+  "message": zod.string(),
+  "createdAt": zod.string()
+})
+export const ListLiveChatResponse = zod.array(ListLiveChatResponseItem)
+
+
+/**
+ * @summary Send a chat message to a live stream
+ */
+export const SendLiveChatParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const sendLiveChatBodyMessageMax = 500;
+
+
+
+export const SendLiveChatBody = zod.object({
+  "message": zod.string().min(1).max(sendLiveChatBodyMessageMax)
 })
 
 
@@ -1034,6 +1134,7 @@ export const StartBattleResponse = zod.object({
   "battleScore": zod.number().optional(),
   "battleOpponentScore": zod.number().optional(),
   "battleEndsAt": zod.string().nullish(),
+  "likeCount": zod.number().optional(),
   "createdAt": zod.string()
 })
 
@@ -1081,6 +1182,7 @@ export const EndBattleResponse = zod.object({
   "battleScore": zod.number().optional(),
   "battleOpponentScore": zod.number().optional(),
   "battleEndsAt": zod.string().nullish(),
+  "likeCount": zod.number().optional(),
   "createdAt": zod.string()
 })
 
@@ -1132,6 +1234,7 @@ export const AddBattleScoreResponse = zod.object({
   "battleScore": zod.number().optional(),
   "battleOpponentScore": zod.number().optional(),
   "battleEndsAt": zod.string().nullish(),
+  "likeCount": zod.number().optional(),
   "createdAt": zod.string()
 })
 

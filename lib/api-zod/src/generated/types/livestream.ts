@@ -39,5 +39,6 @@ export interface Livestream {
   battleOpponentScore?: number;
   /** @nullable */
   battleEndsAt?: string | null;
+  likeCount?: number;
   createdAt: string;
 }
