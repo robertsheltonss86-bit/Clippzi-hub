@@ -89,6 +89,7 @@ import type {
   UploadUrlResponse,
   User,
   UserInput,
+  UserModerationAction,
   UserStats,
   UserUpdate,
   ViewerInfo
@@ -5488,5 +5489,77 @@ export const useResolveModerationReport = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getResolveModerationReportMutationOptions(options));
+    }
+
+export const getModerateUserUrl = (id: number,) => {
+
+
+
+
+  return `/api/moderation/users/${id}/action`
+}
+
+/**
+ * @summary Apply an escalating suspension, lifetime ban, or clear a user (admin only)
+ */
+export const moderateUser = async (id: number,
+    userModerationAction: UserModerationAction, options?: RequestInit): Promise<User> => {
+
+  return customFetch<User>(getModerateUserUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      userModerationAction,)
+  }
+);}
+
+
+
+
+export const getModerateUserMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof moderateUser>>, TError,{id: number;data: BodyType<UserModerationAction>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof moderateUser>>, TError,{id: number;data: BodyType<UserModerationAction>}, TContext> => {
+
+const mutationKey = ['moderateUser'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof moderateUser>>, {id: number;data: BodyType<UserModerationAction>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  moderateUser(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ModerateUserMutationResult = NonNullable<Awaited<ReturnType<typeof moderateUser>>>
+    export type ModerateUserMutationBody = BodyType<UserModerationAction>
+    export type ModerateUserMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Apply an escalating suspension, lifetime ban, or clear a user (admin only)
+ */
+export const useModerateUser = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof moderateUser>>, TError,{id: number;data: BodyType<UserModerationAction>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof moderateUser>>,
+        TError,
+        {id: number;data: BodyType<UserModerationAction>},
+        TContext
+      > => {
+      return useMutation(getModerateUserMutationOptions(options));
     }
 

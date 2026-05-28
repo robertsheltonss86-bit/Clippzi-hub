@@ -3,12 +3,13 @@ import {
   useListModerationReports,
   getListModerationReportsQueryKey,
   useResolveModerationReport,
+  useModerateUser,
 } from "@workspace/api-client-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Banknote, DollarSign, TrendingUp, Users, ExternalLink, Info, AlertTriangle, Bot, Check, Trash2 } from "lucide-react";
+import { Shield, Banknote, DollarSign, TrendingUp, Users, ExternalLink, Info, AlertTriangle, Bot, Check, Trash2, Clock, Ban } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const apiBase = `${import.meta.env.BASE_URL}api`;
@@ -23,14 +24,38 @@ function ModerationQueue() {
     { query: { queryKey: getListModerationReportsQueryKey({ status: "pending" }), refetchInterval: 10000 } },
   );
   const resolve = useResolveModerationReport();
+  const moderateUser = useModerateUser();
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: getListModerationReportsQueryKey({ status: "pending" }) });
 
   const act = (id: number, status: "actioned" | "dismissed") => {
     resolve.mutate(
       { id, data: { status } },
       {
         onSuccess: async () => {
-          await queryClient.invalidateQueries({ queryKey: getListModerationReportsQueryKey({ status: "pending" }) });
+          await refresh();
           toast({ title: status === "actioned" ? "Content removed" : "Report dismissed" });
+        },
+        onError: (e: any) => toast({ title: "Action failed", description: String(e?.message ?? e), variant: "destructive" }),
+      },
+    );
+  };
+
+  const moderate = (userId: number, reportId: number, action: "suspend" | "ban" | "clear") => {
+    moderateUser.mutate(
+      { id: userId, data: { action, reportId } },
+      {
+        onSuccess: async (u: any) => {
+          await refresh();
+          const msg =
+            action === "ban"
+              ? "User permanently banned"
+              : action === "clear"
+                ? "User cleared & report dismissed"
+                : u?.suspendedUntil
+                  ? `User suspended until ${new Date(u.suspendedUntil).toLocaleString()}`
+                  : "User suspended";
+          toast({ title: msg });
         },
         onError: (e: any) => toast({ title: "Action failed", description: String(e?.message ?? e), variant: "destructive" }),
       },
@@ -81,25 +106,59 @@ function ModerationQueue() {
                       ))}
                     </div>
                   )}
-                  <div className="flex gap-2 pt-1">
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      disabled={resolve.isPending}
-                      onClick={() => act(r.id, "actioned")}
-                      data-testid={`button-remove-${r.id}`}
-                    >
-                      <Trash2 className="w-3.5 h-3.5 mr-1" /> Remove
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={resolve.isPending}
-                      onClick={() => act(r.id, "dismissed")}
-                      data-testid={`button-approve-${r.id}`}
-                    >
-                      <Check className="w-3.5 h-3.5 mr-1" /> Approve (dismiss)
-                    </Button>
+                  <div className="flex gap-2 pt-1 flex-wrap">
+                    {r.contentType === "user" ? (
+                      <>
+                        <Button
+                          size="sm"
+                          className="bg-secondary text-white hover:bg-secondary/90"
+                          disabled={moderateUser.isPending}
+                          onClick={() => moderate(r.contentId, r.id, "suspend")}
+                          data-testid={`button-suspend-${r.id}`}
+                        >
+                          <Clock className="w-3.5 h-3.5 mr-1" /> Suspend (escalates)
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={moderateUser.isPending}
+                          onClick={() => moderate(r.contentId, r.id, "ban")}
+                          data-testid={`button-ban-${r.id}`}
+                        >
+                          <Ban className="w-3.5 h-3.5 mr-1" /> Ban for life
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={moderateUser.isPending}
+                          onClick={() => moderate(r.contentId, r.id, "clear")}
+                          data-testid={`button-clear-${r.id}`}
+                        >
+                          <Check className="w-3.5 h-3.5 mr-1" /> Clear (not a violation)
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={resolve.isPending}
+                          onClick={() => act(r.id, "actioned")}
+                          data-testid={`button-remove-${r.id}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5 mr-1" /> Remove
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={resolve.isPending}
+                          onClick={() => act(r.id, "dismissed")}
+                          data-testid={`button-approve-${r.id}`}
+                        >
+                          <Check className="w-3.5 h-3.5 mr-1" /> Approve (dismiss)
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               );

@@ -24,5 +24,11 @@ export interface User {
   postCount?: number;
   totalViews?: number;
   role?: UserRole;
+  /** @nullable */
+  suspendedUntil?: string | null;
+  isBanned?: boolean;
+  offenseCount?: number;
+  /** @nullable */
+  suspensionReason?: string | null;
   createdAt: string;
 }

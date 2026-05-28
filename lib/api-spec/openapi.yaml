@@ -1488,6 +1488,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/ModerationReport"
 
+  /moderation/users/{id}/action:
+    post:
+      operationId: moderateUser
+      tags: [moderation]
+      summary: Apply an escalating suspension, lifetime ban, or clear a user (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserModerationAction"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
 components:
   schemas:
     AuthUser:
@@ -1562,6 +1587,10 @@ components:
         postCount: { type: integer }
         totalViews: { type: integer }
         role: { type: string, enum: [user, streamer, admin] }
+        suspendedUntil: { type: ["string", "null"] }
+        isBanned: { type: boolean }
+        offenseCount: { type: integer }
+        suspensionReason: { type: ["string", "null"] }
         createdAt: { type: string }
 
     UserInput:
@@ -2051,13 +2080,21 @@ components:
 
     ModerationReportInput:
       type: object
-      required: [reporterId, contentType, contentId, reason]
+      required: [contentType, contentId, reason]
       properties:
         reporterId: { type: integer }
         contentType: { type: string, enum: [post, comment, user, stream] }
         contentId: { type: integer }
         reason: { type: string, enum: [bullying, harassment, drugs, spam, nudity, violence, other] }
         description: { type: string }
+
+    UserModerationAction:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [suspend, ban, clear] }
+        reportId: { type: integer }
+        reason: { type: string }
 
     ModerationReportUpdate:
       type: object

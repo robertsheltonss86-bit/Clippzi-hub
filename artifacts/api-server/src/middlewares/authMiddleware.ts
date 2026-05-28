@@ -1,6 +1,8 @@
 import * as oidc from "openid-client";
 import { type Request, type Response, type NextFunction } from "express";
 import type { AuthUser } from "@workspace/api-zod";
+import { db, usersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import {
   clearSession,
   getOidcConfig,
@@ -71,5 +73,29 @@ export function requireSelf(paramName = "id") {
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Login required" }); return; }
   if (!req.user?.isAdmin) { res.status(403).json({ error: "Admin only" }); return; }
+  next();
+}
+
+// Blocks suspended or banned users from creating content (posts, comments, going live, chat).
+export async function requireNotSuspended(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const bodyUserId = req.body?.userId != null ? Number(req.body.userId) : undefined;
+  const userId = req.user?.appUserId ?? bodyUserId;
+  if (!userId) { next(); return; }
+  const [u] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+  if (!u) { next(); return; }
+  if (u.isBanned) {
+    res.status(403).json({
+      error: "Your account has been permanently banned for violating Clippzi community guidelines.",
+      banned: true,
+    });
+    return;
+  }
+  if (u.suspendedUntil && u.suspendedUntil > new Date()) {
+    res.status(403).json({
+      error: `Your account is suspended for violating Clippzi community guidelines. Access returns ${u.suspendedUntil.toLocaleString()}.`,
+      suspendedUntil: u.suspendedUntil.toISOString(),
+    });
+    return;
+  }
   next();
 }

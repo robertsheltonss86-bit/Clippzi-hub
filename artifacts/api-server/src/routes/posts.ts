@@ -17,7 +17,7 @@ import {
   DeleteCommentParams,
 } from "@workspace/api-zod";
 import { followsTable, moderationReportsTable } from "@workspace/db";
-import { requireAuth } from "../middlewares/authMiddleware";
+import { requireAuth, requireNotSuspended } from "../middlewares/authMiddleware";
 import { moderateText, flagToReportReason, GUIDELINES_BLOCK_MESSAGE } from "../lib/moderation";
 
 const router = Router();
@@ -52,16 +52,19 @@ router.get("/posts", async (req, res) => {
 });
 
 // POST /posts
-router.post("/posts", async (req, res) => {
+router.post("/posts", requireAuth, requireNotSuspended, async (req, res) => {
   try {
     const body = CreatePostBody.parse(req.body);
+    // Security: author is always the authenticated user (ignore client-supplied userId).
+    const userId = req.user?.appUserId;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
     const mod = await moderateText([body.title, body.description].filter(Boolean).join(". "));
     if (mod.decision === "block") {
       return res.status(422).json({ error: GUIDELINES_BLOCK_MESSAGE });
     }
     const moderationStatus = mod.decision === "flag" ? "pending" : "approved";
     const [post] = await db.insert(postsTable).values({
-      userId: body.userId,
+      userId,
       type: body.type as "video" | "image",
       title: body.title ?? null,
       description: body.description ?? null,
@@ -85,7 +88,7 @@ router.post("/posts", async (req, res) => {
         aiFlags: mod.flags,
       });
     }
-    await db.update(usersTable).set({ postCount: sql`${usersTable.postCount} + 1` }).where(eq(usersTable.id, body.userId));
+    await db.update(usersTable).set({ postCount: sql`${usersTable.postCount} + 1` }).where(eq(usersTable.id, userId));
     res.status(201).json(await enrichPost(post));
   } catch (e) {
     res.status(400).json({ error: String(e) });
@@ -258,7 +261,7 @@ router.get("/comments", async (req, res) => {
 });
 
 // POST /comments
-router.post("/comments", requireAuth, async (req, res) => {
+router.post("/comments", requireAuth, requireNotSuspended, async (req, res) => {
   try {
     const body = CreateCommentBody.parse(req.body);
     const userId = req.user!.appUserId;

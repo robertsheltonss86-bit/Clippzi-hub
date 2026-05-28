@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { livestreamsTable, usersTable, liveChatMessagesTable, livestreamCohostsTable, livestreamBattleRequestsTable, moderationReportsTable } from "@workspace/db";
 import { and } from "drizzle-orm";
 import { eq, sql, desc, inArray } from "drizzle-orm";
-import { requireAuth } from "../middlewares/authMiddleware";
+import { requireAuth, requireNotSuspended } from "../middlewares/authMiddleware";
 import { moderateText, flagToReportReason, GUIDELINES_BLOCK_MESSAGE } from "../lib/moderation";
 import { livekitConfigured, getLivekitUrl, mintLivekitToken, removeLivekitParticipant } from "../lib/livekit";
 import {
@@ -99,7 +99,7 @@ router.get("/livestreams", async (req, res) => {
 });
 
 // POST /livestreams
-router.post("/livestreams", requireAuth, async (req, res) => {
+router.post("/livestreams", requireAuth, requireNotSuspended, async (req, res) => {
   try {
     const body = StartLivestreamBody.parse(req.body);
     // Security: stream owner is always the authenticated user (ignore client-supplied userId)
@@ -342,7 +342,7 @@ router.get("/livestreams/:id/chat", async (req, res) => {
 });
 
 // POST /livestreams/:id/chat
-router.post("/livestreams/:id/chat", requireAuth, async (req, res) => {
+router.post("/livestreams/:id/chat", requireAuth, requireNotSuspended, async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });

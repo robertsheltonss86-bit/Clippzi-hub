@@ -97,6 +97,8 @@ export * from './uploadUrlRequest';
 export * from './uploadUrlResponse';
 export * from './user';
 export * from './userInput';
+export * from './userModerationAction';
+export * from './userModerationActionAction';
 export * from './userRole';
 export * from './userStats';
 export * from './userUpdate';

@@ -76,6 +76,12 @@ export interface User {
   postCount?: number;
   totalViews?: number;
   role?: UserRole;
+  /** @nullable */
+  suspendedUntil?: string | null;
+  isBanned?: boolean;
+  offenseCount?: number;
+  /** @nullable */
+  suspensionReason?: string | null;
   createdAt: string;
 }
 
@@ -661,11 +667,26 @@ export const ModerationReportInputReason = {
 } as const;
 
 export interface ModerationReportInput {
-  reporterId: number;
+  reporterId?: number;
   contentType: ModerationReportInputContentType;
   contentId: number;
   reason: ModerationReportInputReason;
   description?: string;
+}
+
+export type UserModerationActionAction = typeof UserModerationActionAction[keyof typeof UserModerationActionAction];
+
+
+export const UserModerationActionAction = {
+  suspend: 'suspend',
+  ban: 'ban',
+  clear: 'clear',
+} as const;
+
+export interface UserModerationAction {
+  action: UserModerationActionAction;
+  reportId?: number;
+  reason?: string;
 }
 
 export type ModerationReportUpdateStatus = typeof ModerationReportUpdateStatus[keyof typeof ModerationReportUpdateStatus];

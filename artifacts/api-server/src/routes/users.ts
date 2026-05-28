@@ -26,6 +26,7 @@ function formatUser(u: typeof usersTable.$inferSelect) {
     ...u,
     createdAt: u.createdAt.toISOString(),
     role: u.role ?? "user",
+    suspendedUntil: u.suspendedUntil?.toISOString() ?? null,
   };
 }
 

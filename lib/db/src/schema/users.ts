@@ -22,6 +22,10 @@ export const usersTable = pgTable("users", {
   stripeAccountId: text("stripe_account_id"),
   stripePayoutsEnabled: boolean("stripe_payouts_enabled").notNull().default(false),
   authUserId: text("auth_user_id").unique(),
+  suspendedUntil: timestamp("suspended_until"),
+  isBanned: boolean("is_banned").notNull().default(false),
+  offenseCount: integer("offense_count").notNull().default(0),
+  suspensionReason: text("suspension_reason"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

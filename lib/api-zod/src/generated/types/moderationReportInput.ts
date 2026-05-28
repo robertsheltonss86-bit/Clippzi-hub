@@ -9,7 +9,7 @@ import type { ModerationReportInputContentType } from './moderationReportInputCo
 import type { ModerationReportInputReason } from './moderationReportInputReason';
 
 export interface ModerationReportInput {
-  reporterId: number;
+  reporterId?: number;
   contentType: ModerationReportInputContentType;
   contentId: number;
   reason: ModerationReportInputReason;

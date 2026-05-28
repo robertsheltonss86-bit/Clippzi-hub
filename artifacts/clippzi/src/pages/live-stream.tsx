@@ -10,10 +10,11 @@ import {
   useListLiveChat,
   getListLiveChatQueryKey,
   useSendLiveChat,
+  useCreateModerationReport,
 } from "@workspace/api-client-react";
 import { useParams, useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Gift as GiftIcon, Heart, Send, Sparkles, Filter, Swords, Share2, X, Check, ArrowLeft, ShieldCheck } from "lucide-react";
+import { Users, Gift as GiftIcon, Heart, Send, Sparkles, Filter, Swords, Share2, X, Check, ArrowLeft, ShieldCheck, Flag } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -98,6 +99,7 @@ export default function LiveStream() {
   const endBattle = useEndBattle();
   const likeMutation = useLikeLivestream();
   const sendChatMutation = useSendLiveChat();
+  const reportMutation = useCreateModerationReport();
 
   const [activeFilter, setActiveFilter] = useState("None");
   const FILTER_CSS: Record<string, string> = {
@@ -116,6 +118,9 @@ export default function LiveStream() {
   const [now, setNow] = useState(Date.now());
   const [chatInput, setChatInput] = useState("");
   const [likeDelta, setLikeDelta] = useState(0);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState<string>("harassment");
+  const [reportDesc, setReportDesc] = useState("");
   const [hearts, setHearts] = useState<{ id: number; x: number; y: number }[]>([]);
   const heartIdRef = useRef(0);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
@@ -203,6 +208,31 @@ export default function LiveStream() {
     } catch (e: any) {
       toast({ title: "Checkout failed", description: String(e?.message ?? e), variant: "destructive" });
     }
+  };
+
+  const submitReport = () => {
+    if (!isAuthenticated || !CURRENT_USER_ID) { login(); return; }
+    if (!stream?.userId) return;
+    reportMutation.mutate(
+      {
+        data: {
+          reporterId: CURRENT_USER_ID,
+          contentType: "user",
+          contentId: stream.userId,
+          reason: reportReason as "bullying" | "harassment" | "drugs" | "spam" | "nudity" | "violence" | "other",
+          description: reportDesc.trim() || undefined,
+        },
+      },
+      {
+        onSuccess: () => {
+          setReportOpen(false);
+          setReportDesc("");
+          setReportReason("harassment");
+          toast({ title: "Report sent", description: "Thanks — our team will review this stream." });
+        },
+        onError: (e: any) => toast({ title: "Couldn't send report", description: String(e?.message ?? e), variant: "destructive" }),
+      },
+    );
   };
 
   const handleSendChat = () => {
@@ -492,6 +522,14 @@ export default function LiveStream() {
                 <Share2 className="w-5 h-5 text-white" />
               </div>
               <span className="text-[10px] text-white font-semibold drop-shadow">Share</span>
+            </button>
+          )}
+          {!isOwnStream && (
+            <button onClick={() => { if (!isAuthenticated || !CURRENT_USER_ID) { login(); return; } setReportOpen(true); }} className="flex flex-col items-center gap-0.5 group" data-testid="button-report-stream" title="Report">
+              <div className="w-11 h-11 rounded-full bg-black/60 backdrop-blur border border-white/10 flex items-center justify-center group-active:scale-95 transition-transform">
+                <Flag className="w-5 h-5 text-secondary" />
+              </div>
+              <span className="text-[10px] text-white font-semibold drop-shadow">Report</span>
             </button>
           )}
           {(isOwnStream || isGroup) && (
@@ -785,6 +823,58 @@ export default function LiveStream() {
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setBattleOpen(false)}>Cancel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={reportOpen} onOpenChange={setReportOpen}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2"><Flag className="w-5 h-5 text-secondary" /> Report this live</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground -mt-2 mb-1">
+            Reports go straight to the Clippzi team for review. Repeat or severe violations lead to suspensions or a permanent ban.
+          </p>
+          <div className="space-y-2">
+            {[
+              { value: "harassment", label: "Harassment or bullying" },
+              { value: "drugs", label: "Illegal drug use" },
+              { value: "nudity", label: "Nudity or sexual content" },
+              { value: "violence", label: "Violence or threats" },
+              { value: "spam", label: "Spam or scam" },
+              { value: "other", label: "Something else" },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setReportReason(opt.value)}
+                className={`w-full text-left px-3 py-2.5 rounded-lg border text-sm transition-colors ${
+                  reportReason === opt.value
+                    ? "border-secondary bg-secondary/10 text-white"
+                    : "border-border bg-black/30 text-white/80 hover:border-secondary/50"
+                }`}
+                data-testid={`report-reason-${opt.value}`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <Input
+            value={reportDesc}
+            onChange={(e) => setReportDesc(e.target.value)}
+            placeholder="Add details (optional)"
+            className="bg-black/40 border-border text-white"
+            data-testid="input-report-description"
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setReportOpen(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={submitReport}
+              disabled={reportMutation.isPending}
+              data-testid="button-submit-report"
+            >
+              {reportMutation.isPending ? "Sending…" : "Submit report"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
