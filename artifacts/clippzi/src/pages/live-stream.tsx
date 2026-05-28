@@ -533,7 +533,11 @@ export default function LiveStream() {
             </button>
           )}
           {(isOwnStream || isGroup) && (
-            <CohostPanel streamId={streamId} isHost={isOwnStream} />
+            <CohostPanel
+              streamId={streamId}
+              isHost={isOwnStream}
+              hostUser={stream?.user ? { displayName: stream.user.displayName, username: stream.user.username, avatarUrl: stream.user.avatarUrl } : null}
+            />
           )}
           {isOwnStream && !battleActive && (
             <button onClick={() => setBattleOpen(true)} className="flex flex-col items-center gap-0.5 group" data-testid="button-start-battle" title={battleReqs.outgoing.length > 0 ? "Waiting…" : "Battle"}>
