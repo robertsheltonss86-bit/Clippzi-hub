@@ -458,12 +458,17 @@ router.get("/livestreams/:id/cohosts", async (req, res) => {
       createdAt: r.createdAt.toISOString(),
       user: userMap.get(r.userId) ? { ...userMap.get(r.userId)!, createdAt: userMap.get(r.userId)!.createdAt.toISOString() } : null,
     }));
+    // Additive, backwards-compatible: tell the caller their own request status so a
+    // non-host viewer can reconcile pending/rejected (the API never exposes a
+    // non-host's pending/rejected row in the lists below).
+    const myRow = me ? enriched.find(r => r.userId === me) : undefined;
     res.json({
       mode: stream.mode,
       maxCohosts: stream.maxCohosts,
       inviteCode: isHost ? stream.inviteCode : null,
       approved: enriched.filter(r => r.status === "approved"),
       pending: isHost ? enriched.filter(r => r.status === "pending") : [],
+      me: me ? { status: myRow?.status ?? "none" } : null,
     });
   } catch (e) {
     res.status(400).json({ error: String(e) });

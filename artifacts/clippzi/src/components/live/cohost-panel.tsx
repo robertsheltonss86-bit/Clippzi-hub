@@ -14,6 +14,7 @@ type CohostsResp = {
   inviteCode: string | null;
   approved: CohostRow[];
   pending: CohostRow[];
+  me?: { status: "none" | "pending" | "approved" | "rejected" } | null;
 };
 
 const AVATAR_FALLBACK = "/assets/avatar1.png";
@@ -104,13 +105,27 @@ export function CohostPanel({
         const prev = myStatusRef.current;
         const mineApproved = d.approved.some((r) => r.userId === userId);
         const minePending = d.pending.some((r) => r.userId === userId); // only populated for the host
-        // Non-host viewers never receive their own pending row from the API, so
-        // don't downgrade a locally-known "pending" back to "none" on refresh.
         let next: "none" | "pending" | "approved" | "rejected";
-        if (mineApproved) next = "approved";
-        else if (minePending) next = "pending";
-        else if (!isHost && prev === "pending") next = "pending";
-        else next = "none";
+        if (d.me) {
+          // Server tells us our own status authoritatively. A "rejected" row means
+          // the host declined us — surface it once, then treat as "none" so the
+          // viewer can request again (no permanent pending lock).
+          if (d.me.status === "rejected") {
+            if (prev === "pending") {
+              toast({ title: "Request declined", description: "The host didn't add you this time." });
+            }
+            next = "none";
+          } else {
+            next = d.me.status;
+          }
+        } else {
+          // Fallback for older API responses without `me`: derive from lists, and
+          // don't downgrade a locally-known "pending" (non-hosts get no pending row).
+          if (mineApproved) next = "approved";
+          else if (minePending) next = "pending";
+          else if (!isHost && prev === "pending") next = "pending";
+          else next = "none";
+        }
         // Auto-reload when a pending viewer just got approved so we re-mint a publisher token
         if (!isHost && prev === "pending" && next === "approved") {
           toast({ title: "You're in! 🎉", description: "Joining the grid…" });
