@@ -16,8 +16,9 @@ import {
   CreateCommentBody,
   DeleteCommentParams,
 } from "@workspace/api-zod";
-import { followsTable } from "@workspace/db";
+import { followsTable, moderationReportsTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/authMiddleware";
+import { moderateText, flagToReportReason, GUIDELINES_BLOCK_MESSAGE } from "../lib/moderation";
 
 const router = Router();
 
@@ -40,6 +41,7 @@ router.get("/posts", async (req, res) => {
   try {
     const query = ListPostsQueryParams.parse(req.query);
     let q = db.select().from(postsTable).$dynamic();
+    q = q.where(sql`${postsTable.moderationStatus} <> 'rejected'`);
     if (query.userId) q = q.where(eq(postsTable.userId, query.userId));
     if (query.type && query.type !== "all") q = q.where(eq(postsTable.type, query.type as "video" | "image"));
     const posts = await q.orderBy(desc(postsTable.createdAt)).limit(query.limit ?? 20).offset(query.offset ?? 0);
@@ -53,6 +55,11 @@ router.get("/posts", async (req, res) => {
 router.post("/posts", async (req, res) => {
   try {
     const body = CreatePostBody.parse(req.body);
+    const mod = await moderateText([body.title, body.description].filter(Boolean).join(". "));
+    if (mod.decision === "block") {
+      return res.status(422).json({ error: GUIDELINES_BLOCK_MESSAGE });
+    }
+    const moderationStatus = mod.decision === "flag" ? "pending" : "approved";
     const [post] = await db.insert(postsTable).values({
       userId: body.userId,
       type: body.type as "video" | "image",
@@ -65,8 +72,19 @@ router.post("/posts", async (req, res) => {
       musicUrl: body.musicUrl ?? null,
       duration: body.duration ?? null,
       tags: body.tags ?? [],
-      moderationStatus: "approved",
+      moderationStatus,
     }).returning();
+    if (mod.decision === "flag") {
+      await db.insert(moderationReportsTable).values({
+        contentType: "post",
+        contentId: post.id,
+        reason: flagToReportReason(mod.flags),
+        description: `Auto-flagged by AI moderation: ${mod.reason ?? "borderline content"}`,
+        status: "pending",
+        aiScore: String(mod.score),
+        aiFlags: mod.flags,
+      });
+    }
     await db.update(usersTable).set({ postCount: sql`${usersTable.postCount} + 1` }).where(eq(usersTable.id, body.userId));
     res.status(201).json(await enrichPost(post));
   } catch (e) {
@@ -79,6 +97,7 @@ router.get("/posts/trending", async (req, res) => {
   try {
     const query = GetTrendingPostsQueryParams.parse(req.query);
     const posts = await db.select().from(postsTable)
+      .where(sql`${postsTable.moderationStatus} <> 'rejected'`)
       .orderBy(desc(postsTable.viewCount))
       .limit(query.limit ?? 20);
     res.json(await enrichPosts(posts));
@@ -165,6 +184,7 @@ router.get("/feed", async (req, res) => {
   try {
     const query = GetFeedQueryParams.parse(req.query);
     const posts = await db.select().from(postsTable)
+      .where(sql`${postsTable.moderationStatus} <> 'rejected'`)
       .orderBy(desc(postsTable.createdAt))
       .limit(query.limit ?? 20)
       .offset(query.offset ?? 0);
@@ -184,7 +204,10 @@ router.get("/feed/following", async (req, res) => {
     const ids = followed.map((f) => f.followingId);
     if (ids.length === 0) return res.json([]);
     const posts = await db.select().from(postsTable)
-      .where(sql`${postsTable.userId} = ANY(${sql`ARRAY[${sql.join(ids.map(id => sql`${id}`), sql`, `)}]::int[]`})`)
+      .where(and(
+        sql`${postsTable.userId} = ANY(${sql`ARRAY[${sql.join(ids.map(id => sql`${id}`), sql`, `)}]::int[]`})`,
+        sql`${postsTable.moderationStatus} <> 'rejected'`,
+      ))
       .orderBy(desc(postsTable.createdAt))
       .limit(query.limit ?? 20)
       .offset(query.offset ?? 0);
@@ -239,15 +262,32 @@ router.post("/comments", requireAuth, async (req, res) => {
   try {
     const body = CreateCommentBody.parse(req.body);
     const userId = req.user!.appUserId;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
     const postId = Number((req.body as { postId?: number }).postId ?? 0);
     if (!postId) return res.status(400).json({ error: "postId required" });
     const [postRow] = await db.select({ id: postsTable.id }).from(postsTable).where(eq(postsTable.id, postId));
     if (!postRow) return res.status(404).json({ error: "Post not found" });
+    const mod = await moderateText(body.text);
+    if (mod.decision === "block") {
+      return res.status(422).json({ error: GUIDELINES_BLOCK_MESSAGE });
+    }
     const [comment] = await db.insert(commentsTable).values({
       postId,
       userId,
       text: body.text,
+      isFlagged: mod.decision === "flag",
     }).returning();
+    if (mod.decision === "flag") {
+      await db.insert(moderationReportsTable).values({
+        contentType: "comment",
+        contentId: comment.id,
+        reason: flagToReportReason(mod.flags),
+        description: `Auto-flagged by AI moderation: ${mod.reason ?? "borderline content"}`,
+        status: "pending",
+        aiScore: String(mod.score),
+        aiFlags: mod.flags,
+      });
+    }
     await db.update(postsTable).set({ commentCount: sql`${postsTable.commentCount} + 1` }).where(eq(postsTable.id, comment.postId));
     const [user] = await db.select().from(usersTable).where(eq(usersTable.id, comment.userId));
     res.status(201).json({ ...comment, user: user ? { ...user, createdAt: user.createdAt.toISOString() } : null, createdAt: comment.createdAt.toISOString() });

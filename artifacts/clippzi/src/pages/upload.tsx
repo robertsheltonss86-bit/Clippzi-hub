@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Upload as UploadIcon, Video, Image as ImageIcon, Music, X, CheckCircle } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { GuidelinesNote } from "@/components/community-guidelines";
 
 export default function Upload() {
   const [, setLocation] = useLocation();
@@ -104,8 +105,10 @@ export default function Upload() {
         toast({ title: "Posted! 🚀", description: "Your content is now live." });
         setLocation("/");
       },
-      onError: (err) => {
-        toast({ title: "Post failed", description: String(err), variant: "destructive" });
+      onError: (err: any) => {
+        const msg = err?.data?.error ?? err?.message ?? String(err);
+        const blocked = err?.status === 422;
+        toast({ title: blocked ? "Post blocked" : "Post failed", description: msg, variant: "destructive" });
       }
     });
   };
@@ -240,6 +243,8 @@ export default function Upload() {
               />
             </div>
           </div>
+
+          <GuidelinesNote />
 
           <Button
             type="submit"

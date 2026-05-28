@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { livestreamsTable, usersTable, liveChatMessagesTable, livestreamCohostsTable, livestreamBattleRequestsTable } from "@workspace/db";
+import { livestreamsTable, usersTable, liveChatMessagesTable, livestreamCohostsTable, livestreamBattleRequestsTable, moderationReportsTable } from "@workspace/db";
 import { and } from "drizzle-orm";
 import { eq, sql, desc, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/authMiddleware";
+import { moderateText, flagToReportReason, GUIDELINES_BLOCK_MESSAGE } from "../lib/moderation";
 import { livekitConfigured, getLivekitUrl, mintLivekitToken, removeLivekitParticipant } from "../lib/livekit";
 import {
   ListLivestreamsQueryParams,
@@ -103,6 +104,7 @@ router.post("/livestreams", requireAuth, async (req, res) => {
     const body = StartLivestreamBody.parse(req.body);
     // Security: stream owner is always the authenticated user (ignore client-supplied userId)
     const ownerId = req.user!.appUserId;
+    if (!ownerId) return res.status(401).json({ error: "Unauthorized" });
     // Auto-end any of this user's prior live streams so they don't pile up as "ghost" lives.
     await db.update(livestreamsTable)
       .set({ status: "ended", endedAt: new Date() })
@@ -211,7 +213,7 @@ router.post("/livestreams/:id/battle", async (req, res) => {
       }).where(eq(livestreamsTable.id, opponentStreamId));
       return { stream: updatedMe };
     });
-    if ("error" in result) return res.status(result.status).json({ error: result.error });
+    if ("error" in result) return res.status(result.status ?? 400).json({ error: result.error });
     res.json(await enrichStream(result.stream));
   } catch (e) {
     res.status(400).json({ error: String(e) });
@@ -263,7 +265,7 @@ router.post("/livestreams/:id/battle/score", async (req, res) => {
       }).where(eq(livestreamsTable.id, current.battleOpponentId));
       return { stream };
     });
-    if ("error" in result) return res.status(result.status).json({ error: result.error });
+    if ("error" in result) return res.status(result.status ?? 400).json({ error: result.error });
     res.json(await enrichStream(result.stream));
   } catch (e) {
     res.status(400).json({ error: String(e) });
@@ -355,11 +357,26 @@ router.post("/livestreams/:id/chat", requireAuth, async (req, res) => {
     if (raw.length > 500) return res.status(400).json({ error: "Message too long" });
     const [stream] = await db.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
     if (!stream) return res.status(404).json({ error: "Stream not found" });
+    const mod = await moderateText(raw);
+    if (mod.decision === "block") {
+      return res.status(422).json({ error: GUIDELINES_BLOCK_MESSAGE });
+    }
     const [msg] = await db.insert(liveChatMessagesTable).values({
       streamId: id,
       userId,
       message: raw,
     }).returning();
+    if (mod.decision === "flag") {
+      await db.insert(moderationReportsTable).values({
+        contentType: "stream",
+        contentId: msg.id,
+        reason: flagToReportReason(mod.flags),
+        description: `Auto-flagged live chat by AI moderation: ${mod.reason ?? "borderline content"}`,
+        status: "pending",
+        aiScore: String(mod.score),
+        aiFlags: mod.flags,
+      });
+    }
     const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
     res.status(201).json({
       id: msg.id,
@@ -458,6 +475,7 @@ router.post("/livestreams/:id/cohosts/request", requireAuth, async (req, res) =>
   try {
     const id = Number(req.params.id);
     const me = req.user!.appUserId;
+    if (!me) return res.status(401).json({ error: "Unauthorized" });
     const [stream] = await db.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
     if (!stream) return res.status(404).json({ error: "Stream not found" });
     if (stream.mode !== "group") return res.status(400).json({ error: "Stream is not a group live" });
@@ -483,6 +501,7 @@ router.post("/livestreams/:id/cohosts/join-by-code", requireAuth, async (req, re
   try {
     const id = Number(req.params.id);
     const me = req.user!.appUserId;
+    if (!me) return res.status(401).json({ error: "Unauthorized" });
     const code = String(req.body?.code || "").trim().toUpperCase();
     if (!code) return res.status(400).json({ error: "Code required" });
     // Atomic capacity check + approve in a single transaction with row lock

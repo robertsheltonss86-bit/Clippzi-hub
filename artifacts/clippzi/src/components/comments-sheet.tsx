@@ -40,7 +40,10 @@ export function CommentsSheet({ postId, count, children }: { postId: number; cou
           await queryClient.invalidateQueries({ queryKey: getListCommentsQueryKey({ postId }) });
           await queryClient.invalidateQueries({ queryKey: getGetFeedQueryKey() });
         },
-        onError: (e: any) => toast({ title: "Couldn't post comment", description: String(e?.message ?? e), variant: "destructive" }),
+        onError: (e: any) => {
+          const msg = e?.data?.error ?? e?.message ?? String(e);
+          toast({ title: e?.status === 422 ? "Comment blocked" : "Couldn't post comment", description: msg, variant: "destructive" });
+        },
       },
     );
   };

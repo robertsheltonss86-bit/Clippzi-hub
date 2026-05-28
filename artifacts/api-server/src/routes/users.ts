@@ -78,7 +78,11 @@ router.patch("/users/:id", async (req, res) => {
   try {
     const { id } = UpdateUserParams.parse({ id: Number(req.params.id) });
     const body = UpdateUserBody.parse(req.body);
-    const [user] = await db.update(usersTable).set(body).where(eq(usersTable.id, id)).returning();
+    const { role, ...rest } = body;
+    const [user] = await db.update(usersTable).set({
+      ...rest,
+      ...(role ? { role: role as "user" | "streamer" | "admin" } : {}),
+    }).where(eq(usersTable.id, id)).returning();
     if (!user) return res.status(404).json({ error: "User not found" });
     res.json(formatUser(user));
   } catch (e) {

@@ -9,7 +9,7 @@ export const contentTypeEnum = pgEnum("content_type", ["post", "comment", "user"
 
 export const moderationReportsTable = pgTable("moderation_reports", {
   id: serial("id").primaryKey(),
-  reporterId: integer("reporter_id").notNull().references(() => usersTable.id),
+  reporterId: integer("reporter_id").references(() => usersTable.id),
   contentType: contentTypeEnum("content_type").notNull(),
   contentId: integer("content_id").notNull(),
   reason: reportReasonEnum("reason").notNull(),

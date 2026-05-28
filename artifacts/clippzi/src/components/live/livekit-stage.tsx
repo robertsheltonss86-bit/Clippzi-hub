@@ -144,7 +144,7 @@ export function LiveKitBroadcaster({ streamId, filterCss }: { streamId: number; 
                 <p className="text-xs text-muted-foreground">Allow camera + mic when your browser asks.</p>
               </>
             )}
-            {status !== "connecting" && status !== "live" && (
+            {status !== "connecting" && (
               <>
                 <AlertCircle className="w-10 h-10 mx-auto text-secondary" />
                 <p className="text-white font-semibold">

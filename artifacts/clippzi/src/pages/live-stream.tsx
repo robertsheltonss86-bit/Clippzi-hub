@@ -13,7 +13,7 @@ import {
 } from "@workspace/api-client-react";
 import { useParams, useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Gift as GiftIcon, Heart, Send, Sparkles, Filter, Swords, Share2, X, Check, ArrowLeft } from "lucide-react";
+import { Users, Gift as GiftIcon, Heart, Send, Sparkles, Filter, Swords, Share2, X, Check, ArrowLeft, ShieldCheck } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -217,8 +217,9 @@ export default function LiveStream() {
           queryClient.invalidateQueries({ queryKey: getListLiveChatQueryKey(streamId) });
         },
         onError: (err: any) => {
-          setChatInput(msg);
-          toast({ title: "Couldn't send", description: String(err?.message ?? err), variant: "destructive" });
+          const m = err?.data?.error ?? err?.message ?? String(err);
+          if (err?.status !== 422) setChatInput(msg);
+          toast({ title: err?.status === 422 ? "Message blocked" : "Couldn't send", description: m, variant: "destructive" });
         },
       },
     );
@@ -729,7 +730,13 @@ export default function LiveStream() {
           </div>
         )}
 
-        <form onSubmit={(e) => { e.preventDefault(); handleSendChat(); }} className="p-3 border-t border-border bg-card flex gap-2 items-center">
+        <div className="px-3 pt-2 bg-card">
+          <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+            <ShieldCheck className="w-3 h-3 text-primary shrink-0" />
+            Chat is auto-moderated. Be kind — follow our Community Guidelines.
+          </p>
+        </div>
+        <form onSubmit={(e) => { e.preventDefault(); handleSendChat(); }} className="p-3 pt-2 border-t-0 bg-card flex gap-2 items-center">
           <div className="relative flex-1">
             <Input value={chatInput} onChange={(e) => setChatInput(e.target.value)} placeholder={isAuthenticated ? "Say something..." : "Log in to chat"} maxLength={500} className="bg-input border-none rounded-full pr-10" data-testid="input-chat-message" />
             <div className="absolute right-3 top-1/2 -translate-y-1/2"><Heart className="w-4 h-4 text-muted-foreground" /></div>

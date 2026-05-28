@@ -99,7 +99,7 @@ export default function Profile() {
   const { data: posts, refetch: refetchPosts } = useListPosts({ userId });
 
   const updateUser = useUpdateUser();
-  const followUser = useFollowUser(userId);
+  const followUser = useFollowUser();
   const deletePost = useDeletePost();
   const [postToDelete, setPostToDelete] = useState<number | null>(null);
 
@@ -163,7 +163,7 @@ export default function Profile() {
   const handleFollow = () => {
     if (!isAuthenticated || !meId) { login(); return; }
     followUser.mutate(
-      { data: { followerId: meId, action: "follow" } },
+      { id: userId, data: { followerId: meId, action: "follow" } },
       { onSuccess: () => { toast({ title: `Following @${user?.username}` }); refetchUser(); } }
     );
   };

@@ -3,11 +3,28 @@ import { Home, Compass, Radio, PlusSquare, ShoppingBag, Bell, User, ShieldAlert,
 import { AnimatedLogo } from "./animated-logo";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Button } from "@/components/ui/button";
+import { useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { isAuthenticated, isAdmin, userId, user, login, logout, isLoading } = useCurrentUser();
+  const { toast } = useToast();
   const isImmersive = /^\/live\/[^/]+$/.test(location);
+
+  // One-time Community Guidelines welcome for newly signed-in users.
+  useEffect(() => {
+    if (!isAuthenticated || !userId) return;
+    const key = `clippzi:guidelines-seen:${userId}`;
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(key, "1");
+    toast({
+      title: "Welcome to Clippzi 👋",
+      description:
+        "Keep it kind! Posts, comments, and live chat are auto-moderated by AI. Content that breaks our Community Guidelines (bullying, harassment, drugs, hate, nudity, or violence) may be blocked or removed.",
+      duration: 9000,
+    });
+  }, [isAuthenticated, userId, toast]);
 
   const baseItems = [
     { href: "/", icon: Home, label: "For You" },

@@ -105,7 +105,7 @@ export function CameraPreview({ className }: { className?: string }) {
                 <p className="text-xs text-muted-foreground">Tap "Allow" when your browser asks.</p>
               </>
             )}
-            {(status === "denied" || status === "no-device" || status === "insecure" || status === "error" || status === "idle") && status !== "requesting" && (
+            {(status === "denied" || status === "no-device" || status === "insecure" || status === "error" || status === "idle") && (
               <>
                 <AlertCircle className="w-10 h-10 mx-auto text-secondary" />
                 <p className="text-white font-semibold">

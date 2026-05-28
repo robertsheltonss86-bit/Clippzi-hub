@@ -1,13 +1,115 @@
-import { useGetPlatformEarnings } from "@workspace/api-client-react";
-import { useQuery } from "@tanstack/react-query";
+import {
+  useGetPlatformEarnings,
+  useListModerationReports,
+  getListModerationReportsQueryKey,
+  useResolveModerationReport,
+} from "@workspace/api-client-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Banknote, DollarSign, TrendingUp, Users, ExternalLink, Info } from "lucide-react";
+import { Shield, Banknote, DollarSign, TrendingUp, Users, ExternalLink, Info, AlertTriangle, Bot, Check, Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const apiBase = `${import.meta.env.BASE_URL}api`;
 const fmt = (n: number) =>
   `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+function ModerationQueue() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { data: reports, isLoading } = useListModerationReports(
+    { status: "pending" },
+    { query: { queryKey: getListModerationReportsQueryKey({ status: "pending" }), refetchInterval: 10000 } },
+  );
+  const resolve = useResolveModerationReport();
+
+  const act = (id: number, status: "actioned" | "dismissed") => {
+    resolve.mutate(
+      { id, data: { status } },
+      {
+        onSuccess: async () => {
+          await queryClient.invalidateQueries({ queryKey: getListModerationReportsQueryKey({ status: "pending" }) });
+          toast({ title: status === "actioned" ? "Content removed" : "Report dismissed" });
+        },
+        onError: (e: any) => toast({ title: "Action failed", description: String(e?.message ?? e), variant: "destructive" }),
+      },
+    );
+  };
+
+  return (
+    <Card className="mb-6">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <AlertTriangle className="w-5 h-5 text-secondary" /> Moderation Queue
+          {reports && reports.length > 0 && (
+            <Badge variant="outline" className="border-secondary text-secondary">{reports.length} pending</Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">Loading reports…</p>
+        ) : !reports || reports.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">Nothing to review — all clear. 🎉</p>
+        ) : (
+          <div className="space-y-3">
+            {reports.map((r: any) => {
+              const isAI = !r.reporter;
+              return (
+                <div key={r.id} className="p-4 rounded-md border bg-card/50 flex flex-col gap-2" data-testid={`report-${r.id}`}>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="capitalize">{r.contentType} #{r.contentId}</Badge>
+                      <Badge variant="outline" className="capitalize border-red-500/50 text-red-400">{r.reason}</Badge>
+                      {isAI ? (
+                        <span className="flex items-center gap-1 text-xs text-primary"><Bot className="w-3.5 h-3.5" /> AI auto-flag</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">by {r.reporter?.displayName ?? r.reporter?.username ?? "user"}</span>
+                      )}
+                      {typeof r.aiScore === "number" && (
+                        <span className="text-xs text-muted-foreground">score {(r.aiScore * 100).toFixed(0)}%</span>
+                      )}
+                    </div>
+                    <span className="text-[11px] text-muted-foreground">{new Date(r.createdAt).toLocaleString()}</span>
+                  </div>
+                  {r.description && <p className="text-sm text-white/80">{r.description}</p>}
+                  {r.aiFlags && r.aiFlags.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {r.aiFlags.map((f: string) => (
+                        <span key={f} className="text-[10px] px-1.5 py-0.5 rounded bg-secondary/15 text-secondary">{f}</span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-2 pt-1">
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={resolve.isPending}
+                      onClick={() => act(r.id, "actioned")}
+                      data-testid={`button-remove-${r.id}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5 mr-1" /> Remove
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={resolve.isPending}
+                      onClick={() => act(r.id, "dismissed")}
+                      data-testid={`button-approve-${r.id}`}
+                    >
+                      <Check className="w-3.5 h-3.5 mr-1" /> Approve (dismiss)
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Moderation() {
   const { data: earnings } = useGetPlatformEarnings();
@@ -31,7 +133,9 @@ export default function Moderation() {
         <Shield className="w-7 h-7 text-primary" />
         <h1 className="text-3xl font-bold">Platform Admin</h1>
       </div>
-      <p className="text-sm text-muted-foreground mb-6">Your 40% platform revenue from gifts (powered by Stripe Connect)</p>
+      <p className="text-sm text-muted-foreground mb-6">Content moderation queue and your 40% platform revenue from gifts (powered by Stripe Connect)</p>
+
+      <ModerationQueue />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card>

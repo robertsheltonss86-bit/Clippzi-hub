@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { moderationReportsTable, notificationsTable, usersTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { moderationReportsTable, notificationsTable, usersTable, postsTable, commentsTable, liveChatMessagesTable } from "@workspace/db";
+import { eq, desc, sql } from "drizzle-orm";
 import {
   ListModerationReportsQueryParams,
   CreateModerationReportBody,
@@ -55,7 +55,9 @@ router.get("/moderation/reports", async (req, res) => {
     if (query.status) q = q.where(eq(moderationReportsTable.status, query.status as "pending" | "reviewed" | "actioned" | "dismissed"));
     const reports = await q.orderBy(desc(moderationReportsTable.createdAt));
     const enriched = await Promise.all(reports.map(async (r) => {
-      const [reporter] = await db.select().from(usersTable).where(eq(usersTable.id, r.reporterId));
+      const [reporter] = r.reporterId
+        ? await db.select().from(usersTable).where(eq(usersTable.id, r.reporterId))
+        : [null];
       return {
         ...r,
         aiScore: r.aiScore ? Number(r.aiScore) : null,
@@ -85,7 +87,9 @@ router.post("/moderation/reports", async (req, res) => {
       aiScore: null,
       aiFlags: [],
     }).returning();
-    const [reporter] = await db.select().from(usersTable).where(eq(usersTable.id, report.reporterId));
+    const [reporter] = report.reporterId
+      ? await db.select().from(usersTable).where(eq(usersTable.id, report.reporterId))
+      : [null];
     res.status(201).json({
       ...report,
       aiScore: null,
@@ -116,12 +120,36 @@ router.patch("/moderation/reports/:id", async (req, res) => {
   try {
     const { id } = ResolveModerationReportParams.parse({ id: Number(req.params.id) });
     const body = ResolveModerationReportBody.parse(req.body);
+    const [existing] = await db.select().from(moderationReportsTable).where(eq(moderationReportsTable.id, id));
+    if (!existing) return res.status(404).json({ error: "Report not found" });
+
+    // "actioned" = admin removes the offending content from the platform.
+    if (body.status === "actioned") {
+      if (existing.contentType === "post") {
+        await db.update(postsTable)
+          .set({ moderationStatus: "rejected" })
+          .where(eq(postsTable.id, existing.contentId));
+      } else if (existing.contentType === "comment") {
+        const [c] = await db.select().from(commentsTable).where(eq(commentsTable.id, existing.contentId));
+        if (c) {
+          await db.delete(commentsTable).where(eq(commentsTable.id, existing.contentId));
+          await db.update(postsTable)
+            .set({ commentCount: sql`GREATEST(${postsTable.commentCount} - 1, 0)` })
+            .where(eq(postsTable.id, c.postId));
+        }
+      } else if (existing.contentType === "stream") {
+        await db.delete(liveChatMessagesTable).where(eq(liveChatMessagesTable.id, existing.contentId));
+      }
+    }
+
     const [report] = await db.update(moderationReportsTable).set({
       status: body.status as "reviewed" | "actioned" | "dismissed",
       resolvedAt: new Date(),
     }).where(eq(moderationReportsTable.id, id)).returning();
     if (!report) return res.status(404).json({ error: "Report not found" });
-    const [reporter] = await db.select().from(usersTable).where(eq(usersTable.id, report.reporterId));
+    const [reporter] = report.reporterId
+      ? await db.select().from(usersTable).where(eq(usersTable.id, report.reporterId))
+      : [null];
     res.json({
       ...report,
       aiScore: report.aiScore ? Number(report.aiScore) : null,
