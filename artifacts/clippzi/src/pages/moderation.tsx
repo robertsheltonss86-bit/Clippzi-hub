@@ -6,6 +6,7 @@ import {
   useModerateUser,
 } from "@workspace/api-client-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,18 @@ function ModerationQueue() {
   );
   const resolve = useResolveModerationReport();
   const moderateUser = useModerateUser();
+  const [sortBy, setSortBy] = useState<"severity" | "newest">("severity");
+
+  const sortedReports = useMemo(() => {
+    if (!reports) return reports;
+    const sev = (r: any) => (typeof r.aiScore === "number" ? r.aiScore : 0);
+    const time = (r: any) => new Date(r.createdAt).getTime();
+    return [...reports].sort((a: any, b: any) =>
+      sortBy === "severity"
+        ? sev(b) - sev(a) || time(b) - time(a)
+        : time(b) - time(a),
+    );
+  }, [reports, sortBy]);
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: getListModerationReportsQueryKey({ status: "pending" }) });
 
@@ -65,10 +78,35 @@ function ModerationQueue() {
   return (
     <Card className="mb-6">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <AlertTriangle className="w-5 h-5 text-secondary" /> Moderation Queue
-          {reports && reports.length > 0 && (
-            <Badge variant="outline" className="border-secondary text-secondary">{reports.length} pending</Badge>
+        <CardTitle className="flex items-center justify-between gap-2 flex-wrap">
+          <span className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-secondary" /> Moderation Queue
+            {reports && reports.length > 0 && (
+              <Badge variant="outline" className="border-secondary text-secondary">{reports.length} pending</Badge>
+            )}
+          </span>
+          {reports && reports.length > 1 && (
+            <div className="flex items-center gap-1 text-xs font-normal" data-testid="sort-controls">
+              <span className="text-muted-foreground mr-1">Sort:</span>
+              <Button
+                size="sm"
+                variant={sortBy === "severity" ? "secondary" : "outline"}
+                className="h-7 px-2"
+                onClick={() => setSortBy("severity")}
+                data-testid="button-sort-severity"
+              >
+                Severity
+              </Button>
+              <Button
+                size="sm"
+                variant={sortBy === "newest" ? "secondary" : "outline"}
+                className="h-7 px-2"
+                onClick={() => setSortBy("newest")}
+                data-testid="button-sort-newest"
+              >
+                Newest
+              </Button>
+            </div>
           )}
         </CardTitle>
       </CardHeader>
@@ -79,7 +117,7 @@ function ModerationQueue() {
           <p className="text-sm text-muted-foreground py-6 text-center">Nothing to review — all clear. 🎉</p>
         ) : (
           <div className="space-y-3">
-            {reports.map((r: any) => {
+            {(sortedReports ?? reports).map((r: any) => {
               const isAI = !r.reporter;
               return (
                 <div key={r.id} className="p-4 rounded-md border bg-card/50 flex flex-col gap-2" data-testid={`report-${r.id}`}>

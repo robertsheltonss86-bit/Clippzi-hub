@@ -21,25 +21,39 @@ function getClient(): OpenAI | null {
 
 // Cheap keyword pre-filter. Returns "block" for obviously harmful content so we
 // can short-circuit before paying for an API call. Returns null when undecided.
+//
+// Matching is phrase/word-boundary based (not naive substring) so benign words
+// that merely contain a flagged token — e.g. "accept"/"recipe" containing "cp" —
+// are never falsely blocked. Avoid short ambiguous abbreviations here; let the
+// AI moderator handle nuance.
 const HARD_BLOCK_WORDS = [
   "kill yourself",
   "kys",
   "i will find you",
   "i'll find you",
   "child porn",
-  "cp",
+  "child pornography",
 ];
 const DRUG_WORDS = ["cocaine", "meth", "heroin", "fentanyl", "mdma", "ecstasy", "lsd"];
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Matches `phrase` only on word boundaries so it won't fire inside larger words.
+function containsPhrase(text: string, phrase: string): boolean {
+  const re = new RegExp(`(?<![\\w'])${escapeRegExp(phrase)}(?![\\w'])`, "i");
+  return re.test(text);
+}
+
 function keywordPrefilter(text: string): ModerationResult | null {
-  const lower = text.toLowerCase();
   for (const w of HARD_BLOCK_WORDS) {
-    if (lower.includes(w)) {
+    if (containsPhrase(text, w)) {
       return { decision: "block", score: 1, flags: ["self_harm_or_threat"], reason: "keyword:" + w };
     }
   }
   let drugHits = 0;
-  for (const w of DRUG_WORDS) if (lower.includes(w)) drugHits++;
+  for (const w of DRUG_WORDS) if (containsPhrase(text, w)) drugHits++;
   if (drugHits >= 2) {
     return { decision: "block", score: 0.95, flags: ["drugs"], reason: "keyword:drugs" };
   }
