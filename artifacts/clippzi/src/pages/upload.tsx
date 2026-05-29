@@ -163,7 +163,7 @@ export default function Upload() {
               </div>
               <div className="text-center">
                 <p className="text-white font-medium">Click to select or drag and drop</p>
-                <p className="text-sm text-muted-foreground mt-1">MP4, WebM, MOV, JPG, PNG, GIF</p>
+                <p className="text-sm text-muted-foreground mt-1">MP4, WebM, MOV, JPG, PNG, GIF — any length</p>
               </div>
             </div>
           ) : (

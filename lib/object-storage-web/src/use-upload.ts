@@ -84,18 +84,35 @@ export function useUpload(options: UseUploadOptions = {}) {
   );
 
   const uploadToPresignedUrl = useCallback(
-    async (file: File, uploadURL: string): Promise<void> => {
-      const response = await fetch(uploadURL, {
-        method: "PUT",
-        body: file,
-        headers: {
-          "Content-Type": file.type || "application/octet-stream",
-        },
-      });
+    (file: File, uploadURL: string, onProgress?: (percent: number) => void): Promise<void> => {
+      // Use XMLHttpRequest (not fetch) so we get real upload progress events.
+      // This matters for large files such as multi-minute videos: with fetch the
+      // progress bar would sit frozen for the whole upload and users assumed long
+      // videos "don't work" and gave up. There is intentionally NO client timeout
+      // so big files have as long as they need to finish.
+      return new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", uploadURL, true);
+        xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
 
-      if (!response.ok) {
-        throw new Error("Failed to upload file to storage");
-      }
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable && onProgress) {
+            onProgress(Math.round((event.loaded / event.total) * 100));
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+          } else {
+            reject(new Error(`Failed to upload file to storage (status ${xhr.status})`));
+          }
+        };
+        xhr.onerror = () => reject(new Error("Network error while uploading. Check your connection and try again."));
+        xhr.onabort = () => reject(new Error("Upload was cancelled."));
+
+        xhr.send(file);
+      });
     },
     []
   );
@@ -107,11 +124,11 @@ export function useUpload(options: UseUploadOptions = {}) {
       setProgress(0);
 
       try {
-        setProgress(10);
         const uploadResponse = await requestUploadUrl(file);
 
-        setProgress(30);
-        await uploadToPresignedUrl(file, uploadResponse.uploadURL);
+        await uploadToPresignedUrl(file, uploadResponse.uploadURL, (percent) => {
+          setProgress(percent);
+        });
 
         setProgress(100);
         options.onSuccess?.(uploadResponse);
