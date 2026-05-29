@@ -109,6 +109,7 @@ export default function Home() {
                   className="w-full h-full object-cover"
                   loop
                   playsInline
+                  muted
                   controls
                   autoPlay
                   data-testid={`video-post-${post.id}`}
