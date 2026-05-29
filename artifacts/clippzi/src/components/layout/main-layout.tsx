@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Compass, Radio, PlusSquare, ShoppingBag, Bell, User, ShieldAlert, LogIn, LogOut } from "lucide-react";
+import { Home, Compass, Radio, PlusSquare, ShoppingBag, Bell, User, ShieldAlert, LogIn, LogOut, MessageCircle } from "lucide-react";
 import { AnimatedLogo } from "./animated-logo";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Button } from "@/components/ui/button";
@@ -74,6 +74,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   const profileHref = userId ? `/profile/${userId}` : "/";
   const navItems = [
     ...baseItems,
+    { href: "/messages", icon: MessageCircle, label: "Messages" },
     { href: profileHref, icon: User, label: "Profile" },
     ...(isAdmin ? [{ href: "/moderation", icon: ShieldAlert, label: "Mod" }] : []),
   ];
@@ -143,6 +144,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
               <div className="cursor-pointer"><AnimatedLogo /></div>
             </Link>
             <div className="flex gap-4 items-center">
+              <Link href="/messages"><MessageCircle className="w-6 h-6 text-foreground cursor-pointer" /></Link>
               <Link href="/notifications"><Bell className="w-6 h-6 text-foreground cursor-pointer" /></Link>
               {!isLoading && (
                 isAuthenticated && userId ? (

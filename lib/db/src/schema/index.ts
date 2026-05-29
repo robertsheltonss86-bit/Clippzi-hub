@@ -6,3 +6,4 @@ export * from "./shop";
 export * from "./moderation";
 export * from "./payouts";
 export * from "./auth";
+export * from "./messages";

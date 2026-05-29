@@ -1405,6 +1405,65 @@ paths:
               schema:
                 $ref: "#/components/schemas/Notification"
 
+  # ── MESSAGES (DMs) ──
+  /conversations:
+    get:
+      operationId: listConversations
+      tags: [messages]
+      summary: List the signed-in user's conversations
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Conversation"
+
+  /messages:
+    get:
+      operationId: listMessages
+      tags: [messages]
+      summary: List messages between the signed-in user and another user
+      parameters:
+        - name: otherUserId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+    post:
+      operationId: sendMessage
+      tags: [messages]
+      summary: Send a direct message to another user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+
   # ── MODERATION ──
   /moderation/reports:
     get:
@@ -2029,6 +2088,38 @@ components:
       required: [isRead]
       properties:
         isRead: { type: boolean }
+
+    # ── MESSAGES (DMs) ──
+    Message:
+      type: object
+      required: [id, conversationId, senderId, recipientId, text, isRead, createdAt]
+      properties:
+        id: { type: integer }
+        conversationId: { type: integer }
+        senderId: { type: integer }
+        recipientId: { type: integer }
+        text: { type: string }
+        isRead: { type: boolean }
+        sender: { $ref: "#/components/schemas/User" }
+        createdAt: { type: string }
+
+    Conversation:
+      type: object
+      required: [id, otherUser, unreadCount, createdAt]
+      properties:
+        id: { type: integer }
+        otherUser: { $ref: "#/components/schemas/User" }
+        lastMessageText: { type: ["string", "null"] }
+        lastMessageAt: { type: ["string", "null"] }
+        unreadCount: { type: integer }
+        createdAt: { type: string }
+
+    MessageInput:
+      type: object
+      required: [recipientId, text]
+      properties:
+        recipientId: { type: integer }
+        text: { type: string }
 
     # ── MODERATION ──
     ModerationReport:

@@ -1908,6 +1908,82 @@ export const MarkNotificationReadResponse = zod.object({
 
 
 /**
+ * @summary List the signed-in user's conversations
+ */
+export const ListConversationsResponseItem = zod.object({
+  "id": zod.number(),
+  "otherUser": zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string(),
+  "bio": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "bannerUrl": zod.string().nullish(),
+  "isVerified": zod.boolean().optional(),
+  "isLive": zod.boolean().optional(),
+  "followerCount": zod.number().optional(),
+  "followingCount": zod.number().optional(),
+  "postCount": zod.number().optional(),
+  "totalViews": zod.number().optional(),
+  "role": zod.enum(['user', 'streamer', 'admin']).optional(),
+  "createdAt": zod.string()
+}),
+  "lastMessageText": zod.string().nullish(),
+  "lastMessageAt": zod.string().nullish(),
+  "unreadCount": zod.number(),
+  "createdAt": zod.string()
+})
+export const ListConversationsResponse = zod.array(ListConversationsResponseItem)
+
+
+/**
+ * @summary List messages between the signed-in user and another user
+ */
+export const listMessagesQueryLimitDefault = 100;
+
+export const ListMessagesQueryParams = zod.object({
+  "otherUserId": zod.coerce.number(),
+  "limit": zod.coerce.number().default(listMessagesQueryLimitDefault)
+})
+
+export const ListMessagesResponseItem = zod.object({
+  "id": zod.number(),
+  "conversationId": zod.number(),
+  "senderId": zod.number(),
+  "recipientId": zod.number(),
+  "text": zod.string(),
+  "isRead": zod.boolean(),
+  "sender": zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string(),
+  "bio": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "bannerUrl": zod.string().nullish(),
+  "isVerified": zod.boolean().optional(),
+  "isLive": zod.boolean().optional(),
+  "followerCount": zod.number().optional(),
+  "followingCount": zod.number().optional(),
+  "postCount": zod.number().optional(),
+  "totalViews": zod.number().optional(),
+  "role": zod.enum(['user', 'streamer', 'admin']).optional(),
+  "createdAt": zod.string()
+}).optional(),
+  "createdAt": zod.string()
+})
+export const ListMessagesResponse = zod.array(ListMessagesResponseItem)
+
+
+/**
+ * @summary Send a direct message to another user
+ */
+export const SendMessageBody = zod.object({
+  "recipientId": zod.number(),
+  "text": zod.string()
+})
+
+
+/**
  * @summary List content moderation reports
  */
 export const ListModerationReportsQueryParams = zod.object({

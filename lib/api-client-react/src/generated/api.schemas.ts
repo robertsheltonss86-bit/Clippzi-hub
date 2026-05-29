@@ -587,6 +587,33 @@ export interface NotificationReadInput {
   isRead: boolean;
 }
 
+export interface Message {
+  id: number;
+  conversationId: number;
+  senderId: number;
+  recipientId: number;
+  text: string;
+  isRead: boolean;
+  sender?: User;
+  createdAt: string;
+}
+
+export interface Conversation {
+  id: number;
+  otherUser: User;
+  /** @nullable */
+  lastMessageText?: string | null;
+  /** @nullable */
+  lastMessageAt?: string | null;
+  unreadCount: number;
+  createdAt: string;
+}
+
+export interface MessageInput {
+  recipientId: number;
+  text: string;
+}
+
 export type ModerationReportContentType = typeof ModerationReportContentType[keyof typeof ModerationReportContentType];
 
 
@@ -892,6 +919,11 @@ limit?: number;
 export type ListNotificationsParams = {
 userId: number;
 unreadOnly?: boolean;
+};
+
+export type ListMessagesParams = {
+otherUserId: number;
+limit?: number;
 };
 
 export type ListModerationReportsParams = {

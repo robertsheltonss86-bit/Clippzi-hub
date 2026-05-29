@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Camera, Edit2, CheckCircle, Heart, Play, Users, Video, Eye, BadgeCheck, DollarSign, Trash2, LogOut } from "lucide-react";
+import { Camera, Edit2, CheckCircle, Heart, Play, Users, Video, Eye, BadgeCheck, DollarSign, Trash2, LogOut, MessageCircle } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 
 function StatBox({ label, value }: { label: string; value: string | number }) {
@@ -262,17 +262,28 @@ export default function Profile() {
                 <Edit2 className="w-3.5 h-3.5" /> Edit Profile
               </Button>
             ) : (
-              <Button
-                onClick={handleFollow}
-                size="sm"
-                disabled={followUser.isPending}
-                className={isFollowing
-                  ? "bg-transparent border border-border text-white font-bold hover:bg-muted"
-                  : "bg-primary text-black font-bold hover:bg-primary/90"}
-                data-testid="button-follow"
-              >
-                {followUser.isPending ? "…" : isFollowing ? "Following" : "Follow"}
-              </Button>
+              <>
+                <Button
+                  onClick={handleFollow}
+                  size="sm"
+                  disabled={followUser.isPending}
+                  className={isFollowing
+                    ? "bg-transparent border border-border text-white font-bold hover:bg-muted"
+                    : "bg-primary text-black font-bold hover:bg-primary/90"}
+                  data-testid="button-follow"
+                >
+                  {followUser.isPending ? "…" : isFollowing ? "Following" : "Follow"}
+                </Button>
+                <Button
+                  onClick={() => meId ? setLocation(`/messages/${userId}`) : login()}
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 border-border"
+                  data-testid="button-message"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" /> Message
+                </Button>
+              </>
             )}
             {isOwnProfile && (
               <Button onClick={() => setLocation(`/profile/${userId}/earnings`)} variant="outline" size="sm" className="gap-1.5 border-border">
