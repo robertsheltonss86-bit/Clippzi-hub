@@ -95,9 +95,15 @@ export default function Home() {
     // Build the link from the live origin so it always points at the real,
     // working app (and lets messaging apps load the Clippzi preview card).
     const shareUrl = `${window.location.origin}${import.meta.env.BASE_URL}p/${post.id}`;
+    const creator = post.user?.username ? `@${post.user.username}` : "a creator";
+    // Branded, human-readable message so the share leads with the video +
+    // Clippzi name (and logo preview card) rather than a bare link.
+    const shareText = post.title
+      ? `Watch "${post.title}" by ${creator} on Clippzi`
+      : `Watch this video by ${creator} on Clippzi`;
     const shareData: ShareData = {
-      title: `@${post.user?.username ?? "clippzi"} on Clippzi`,
-      text: post.title ? `${post.title} — watch on Clippzi` : "Check out this video on Clippzi",
+      title: "Clippzi",
+      text: shareText,
       url: shareUrl,
     };
 
@@ -121,8 +127,8 @@ export default function Home() {
     // gesture, so it is not awaited behind the network request above.
     const copyFallback = () => {
       if (navigator.clipboard) {
-        navigator.clipboard.writeText(shareUrl).catch(() => {});
-        toast({ title: "Link copied!", description: shareUrl });
+        navigator.clipboard.writeText(`${shareText} ${shareUrl}`).catch(() => {});
+        toast({ title: "Copied to clipboard", description: shareText });
       }
     };
 
