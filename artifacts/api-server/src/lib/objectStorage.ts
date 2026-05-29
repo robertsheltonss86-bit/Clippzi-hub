@@ -170,6 +170,20 @@ export class ObjectStorageService {
     return new Response(webStream, { status: 200, headers });
   }
 
+  // Returns a short-lived signed GET URL pointing directly at the object in
+  // Google Cloud Storage. Serving media via a redirect to this URL lets the
+  // client stream bytes directly from GCS (with native range support) instead
+  // of proxying every byte through this app server, which is dramatically
+  // faster for large files such as videos.
+  async getObjectEntityDownloadURL(file: File, ttlSec: number = 3600): Promise<string> {
+    return signObjectURL({
+      bucketName: file.bucket.name,
+      objectName: file.name,
+      method: "GET",
+      ttlSec,
+    });
+  }
+
   async getObjectEntityUploadURL(): Promise<string> {
     const privateObjectDir = this.getPrivateObjectDir();
     if (!privateObjectDir) {

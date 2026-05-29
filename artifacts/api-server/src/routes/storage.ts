@@ -1,5 +1,4 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { Readable } from "stream";
 import {
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
@@ -60,21 +59,10 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
       return;
     }
 
-    const response = await objectStorageService.downloadObject(
-      file,
-      3600,
-      req.headers.range,
-    );
-
-    res.status(response.status);
-    response.headers.forEach((value, key) => res.setHeader(key, value));
-
-    if (response.body) {
-      const nodeStream = Readable.fromWeb(response.body as ReadableStream<Uint8Array>);
-      nodeStream.pipe(res);
-    } else {
-      res.end();
-    }
+    // Redirect directly to GCS so the client streams from Google's
+    // infrastructure instead of proxying every byte through this server.
+    const signedUrl = await objectStorageService.getObjectEntityDownloadURL(file, 3600);
+    res.redirect(302, signedUrl);
   } catch (error) {
     req.log.error({ err: error }, "Error serving public object");
     res.status(500).json({ error: "Failed to serve public object" });
@@ -110,21 +98,11 @@ router.get("/storage/objects/*path", async (req: Request, res: Response) => {
     //   return;
     // }
 
-    const response = await objectStorageService.downloadObject(
-      objectFile,
-      3600,
-      req.headers.range,
-    );
-
-    res.status(response.status);
-    response.headers.forEach((value, key) => res.setHeader(key, value));
-
-    if (response.body) {
-      const nodeStream = Readable.fromWeb(response.body as ReadableStream<Uint8Array>);
-      nodeStream.pipe(res);
-    } else {
-      res.end();
-    }
+    // Redirect directly to GCS so the client streams from Google's
+    // infrastructure (with native range support) instead of proxying every
+    // byte through this server — dramatically faster for large videos.
+    const signedUrl = await objectStorageService.getObjectEntityDownloadURL(objectFile, 3600);
+    res.redirect(302, signedUrl);
   } catch (error) {
     if (error instanceof ObjectNotFoundError) {
       req.log.warn({ err: error }, "Object not found");
