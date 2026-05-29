@@ -148,17 +148,23 @@ router.delete("/posts/:id", requireAuth, async (req, res) => {
 });
 
 // POST /posts/:id/like
-router.post("/posts/:id/like", async (req, res) => {
+router.post("/posts/:id/like", requireAuth, async (req, res) => {
   try {
     const { id } = LikePostParams.parse({ id: Number(req.params.id) });
     const body = LikePostBody.parse(req.body);
+    // Derive the actor from the authenticated session — never trust a
+    // client-supplied userId (prevents like spoofing as another user).
+    const userId = req.user!.appUserId;
+    if (!userId) return res.status(401).json({ error: "No app user linked" });
     if (body.liked) {
-      await db.insert(postLikesTable).values({ postId: id, userId: body.userId }).onConflictDoNothing();
-      await db.update(postsTable).set({ likeCount: sql`${postsTable.likeCount} + 1` }).where(eq(postsTable.id, id));
+      await db.insert(postLikesTable).values({ postId: id, userId }).onConflictDoNothing();
     } else {
-      await db.delete(postLikesTable).where(and(eq(postLikesTable.postId, id), eq(postLikesTable.userId, body.userId)));
-      await db.update(postsTable).set({ likeCount: sql`GREATEST(${postsTable.likeCount} - 1, 0)` }).where(eq(postsTable.id, id));
+      await db.delete(postLikesTable).where(and(eq(postLikesTable.postId, id), eq(postLikesTable.userId, userId)));
     }
+    // Recompute from post_likes (source of truth) so repeated clicks can't inflate the count.
+    await db.update(postsTable)
+      .set({ likeCount: sql`(SELECT COUNT(*) FROM post_likes WHERE post_id = ${id})` })
+      .where(eq(postsTable.id, id));
     const [post] = await db.select({ likeCount: postsTable.likeCount }).from(postsTable).where(eq(postsTable.id, id));
     res.json({ liked: body.liked, likeCount: post?.likeCount ?? 0 });
   } catch (e) {

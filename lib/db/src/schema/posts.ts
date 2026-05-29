@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, boolean, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp, pgEnum, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -33,7 +33,9 @@ export const postLikesTable = pgTable("post_likes", {
   postId: integer("post_id").notNull().references(() => postsTable.id),
   userId: integer("user_id").notNull().references(() => usersTable.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => ({
+  uniqLike: unique("post_likes_post_user_unique").on(t.postId, t.userId),
+}));
 
 export const commentsTable = pgTable("comments", {
   id: serial("id").primaryKey(),

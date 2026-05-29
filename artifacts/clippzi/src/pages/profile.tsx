@@ -1,4 +1,4 @@
-import { useGetUser, useGetUserStats, useUpdateUser, useListPosts, useFollowUser, useDeletePost } from "@workspace/api-client-react";
+import { useGetUser, useGetUserStats, useUpdateUser, useListPosts, useFollowUser, useGetUserFollowers, useDeletePost } from "@workspace/api-client-react";
 import { useUpload } from "@workspace/object-storage-web";
 import { useParams, useLocation } from "wouter";
 import { useState, useRef } from "react";
@@ -100,6 +100,8 @@ export default function Profile() {
 
   const updateUser = useUpdateUser();
   const followUser = useFollowUser();
+  const { data: followers, refetch: refetchFollowers } = useGetUserFollowers(userId);
+  const isFollowing = !!meId && !isOwnProfile && (followers ?? []).some((f) => f.id === meId);
   const deletePost = useDeletePost();
   const [postToDelete, setPostToDelete] = useState<number | null>(null);
 
@@ -162,9 +164,16 @@ export default function Profile() {
 
   const handleFollow = () => {
     if (!isAuthenticated || !meId) { login(); return; }
+    const action = isFollowing ? "unfollow" : "follow";
     followUser.mutate(
-      { id: userId, data: { followerId: meId, action: "follow" } },
-      { onSuccess: () => { toast({ title: `Following @${user?.username}` }); refetchUser(); } }
+      { id: userId, data: { followerId: meId, action } },
+      {
+        onSuccess: () => {
+          toast({ title: action === "follow" ? `Following @${user?.username}` : `Unfollowed @${user?.username}` });
+          refetchUser();
+          refetchFollowers();
+        },
+      }
     );
   };
 
@@ -233,8 +242,15 @@ export default function Profile() {
                 <Edit2 className="w-3.5 h-3.5" /> Edit Profile
               </Button>
             ) : (
-              <Button onClick={handleFollow} size="sm" className="bg-primary text-black font-bold hover:bg-primary/90">
-                Follow
+              <Button
+                onClick={handleFollow}
+                disabled={followUser.isPending}
+                size="sm"
+                className={isFollowing
+                  ? "bg-transparent border border-border text-white font-bold hover:bg-white/10"
+                  : "bg-primary text-black font-bold hover:bg-primary/90"}
+              >
+                {isFollowing ? "Following" : "Follow"}
               </Button>
             )}
             {isOwnProfile && (

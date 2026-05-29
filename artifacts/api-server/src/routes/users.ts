@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { usersTable, followsTable, bankAccountsTable, giftTransactionsTable, payoutsTable } from "@workspace/db";
 import { eq, ilike, sql, and, desc } from "drizzle-orm";
+import { requireAuth } from "../middlewares/authMiddleware";
 import {
   ListUsersQueryParams,
   CreateUserBody,
@@ -92,24 +93,36 @@ router.patch("/users/:id", async (req, res) => {
 });
 
 // POST /users/:id/follow
-router.post("/users/:id/follow", async (req, res) => {
+router.post("/users/:id/follow", requireAuth, async (req, res) => {
   try {
     const { id } = FollowUserParams.parse({ id: Number(req.params.id) });
-    const body = FollowUserBody.parse(req.body);
-    const { followerId, action } = body;
+    const { action } = FollowUserBody.parse(req.body);
+    // Derive the actor from the authenticated session — never trust a
+    // client-supplied followerId (prevents impersonation).
+    const followerId = req.user!.appUserId;
+    if (!followerId) return res.status(401).json({ error: "No app user linked" });
+
+    if (followerId === id) return res.status(400).json({ error: "Cannot follow yourself" });
 
     if (action === "follow") {
       await db.insert(followsTable).values({ followerId, followingId: id }).onConflictDoNothing();
-      await db.update(usersTable).set({ followerCount: sql`${usersTable.followerCount} + 1` }).where(eq(usersTable.id, id));
-      await db.update(usersTable).set({ followingCount: sql`${usersTable.followingCount} + 1` }).where(eq(usersTable.id, followerId));
     } else {
       await db.delete(followsTable).where(and(eq(followsTable.followerId, followerId), eq(followsTable.followingId, id)));
-      await db.update(usersTable).set({ followerCount: sql`GREATEST(${usersTable.followerCount} - 1, 0)` }).where(eq(usersTable.id, id));
-      await db.update(usersTable).set({ followingCount: sql`GREATEST(${usersTable.followingCount} - 1, 0)` }).where(eq(usersTable.id, followerId));
     }
 
+    // Recompute counts from the follows table (source of truth) so repeated or
+    // duplicate clicks can never inflate the totals.
+    await db.update(usersTable)
+      .set({ followerCount: sql`(SELECT COUNT(*) FROM follows WHERE following_id = ${id})` })
+      .where(eq(usersTable.id, id));
+    await db.update(usersTable)
+      .set({ followingCount: sql`(SELECT COUNT(*) FROM follows WHERE follower_id = ${followerId})` })
+      .where(eq(usersTable.id, followerId));
+
+    const [existing] = await db.select({ id: followsTable.id }).from(followsTable)
+      .where(and(eq(followsTable.followerId, followerId), eq(followsTable.followingId, id)));
     const [updated] = await db.select({ followerCount: usersTable.followerCount }).from(usersTable).where(eq(usersTable.id, id));
-    res.json({ following: action === "follow", followerCount: updated?.followerCount ?? 0 });
+    res.json({ following: !!existing, followerCount: updated?.followerCount ?? 0 });
   } catch (e) {
     res.status(400).json({ error: String(e) });
   }
