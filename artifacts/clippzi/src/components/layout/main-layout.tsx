@@ -53,7 +53,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             const isActive = location === item.href;
             const Icon = item.icon;
             return (
-              <Link key={item.href} href={item.href}>
+              <Link key={item.label} href={item.href}>
                 <div
                   className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 cursor-pointer ${
                     isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -115,7 +115,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
           const isActive = location === item.href;
           const Icon = item.icon;
           return (
-            <Link key={item.href} href={item.href}>
+            <Link key={item.label} href={item.href}>
               <div className="flex flex-col items-center justify-center p-2 cursor-pointer">
                 <Icon className={`w-6 h-6 transition-colors ${isActive ? "text-primary" : "text-muted-foreground"}`} />
               </div>
