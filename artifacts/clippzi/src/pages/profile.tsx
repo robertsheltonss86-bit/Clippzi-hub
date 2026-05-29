@@ -1,4 +1,4 @@
-import { useGetUser, useGetUserStats, useUpdateUser, useListPosts, useFollowUser, useDeletePost } from "@workspace/api-client-react";
+import { useGetUser, useGetUserStats, useUpdateUser, useListPosts, useFollowUser, useGetUserFollowers, useDeletePost } from "@workspace/api-client-react";
 import { useUpload } from "@workspace/object-storage-web";
 import { useParams, useLocation } from "wouter";
 import { useState, useRef } from "react";
@@ -92,11 +92,14 @@ export default function Profile() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [editDisplayName, setEditDisplayName] = useState("");
+  const [editUsername, setEditUsername] = useState("");
   const [editBio, setEditBio] = useState("");
 
   const { data: user, isLoading: userLoading, refetch: refetchUser } = useGetUser(userId);
   const { data: stats } = useGetUserStats(userId);
   const { data: posts, refetch: refetchPosts } = useListPosts({ userId });
+  const { data: followers, refetch: refetchFollowers } = useGetUserFollowers(userId);
+  const isFollowing = !!meId && !!followers?.some((f) => f.id === meId);
 
   const updateUser = useUpdateUser();
   const followUser = useFollowUser();
@@ -124,16 +127,30 @@ export default function Profile() {
 
   const openEdit = () => {
     setEditDisplayName(user?.displayName ?? "");
+    setEditUsername(user?.username ?? "");
     setEditBio(user?.bio ?? "");
     setEditOpen(true);
   };
 
   const saveEdit = () => {
+    const cleanedUsername = editUsername.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+    if (cleanedUsername.length < 3) {
+      toast({ title: "Invalid username", description: "Use at least 3 letters, numbers or underscores.", variant: "destructive" });
+      return;
+    }
+    const data: { displayName: string; bio: string; username?: string } = {
+      displayName: editDisplayName,
+      bio: editBio,
+    };
+    if (cleanedUsername !== user?.username) data.username = cleanedUsername;
     updateUser.mutate(
-      { id: userId, data: { displayName: editDisplayName, bio: editBio } },
+      { id: userId, data },
       {
         onSuccess: () => { toast({ title: "Profile updated!" }); setEditOpen(false); refetchUser(); },
-        onError: (e) => toast({ title: "Failed to update", description: String(e), variant: "destructive" }),
+        onError: (e: any) => {
+          const msg = e?.response?.data?.error ?? e?.message ?? String(e);
+          toast({ title: "Failed to update", description: msg, variant: "destructive" });
+        },
       }
     );
   };
@@ -162,9 +179,21 @@ export default function Profile() {
 
   const handleFollow = () => {
     if (!isAuthenticated || !meId) { login(); return; }
+    if (followUser.isPending) return;
+    const action = isFollowing ? "unfollow" : "follow";
     followUser.mutate(
-      { id: userId, data: { followerId: meId, action: "follow" } },
-      { onSuccess: () => { toast({ title: `Following @${user?.username}` }); refetchUser(); } }
+      { id: userId, data: { followerId: meId, action } },
+      {
+        onSuccess: () => {
+          toast({ title: action === "follow" ? `Following @${user?.username}` : `Unfollowed @${user?.username}` });
+          refetchUser();
+          refetchFollowers();
+        },
+        onError: (e: any) => {
+          const msg = e?.response?.data?.error ?? e?.message ?? String(e);
+          toast({ title: "Something went wrong", description: msg, variant: "destructive" });
+        },
+      }
     );
   };
 
@@ -233,8 +262,16 @@ export default function Profile() {
                 <Edit2 className="w-3.5 h-3.5" /> Edit Profile
               </Button>
             ) : (
-              <Button onClick={handleFollow} size="sm" className="bg-primary text-black font-bold hover:bg-primary/90">
-                Follow
+              <Button
+                onClick={handleFollow}
+                size="sm"
+                disabled={followUser.isPending}
+                className={isFollowing
+                  ? "bg-transparent border border-border text-white font-bold hover:bg-muted"
+                  : "bg-primary text-black font-bold hover:bg-primary/90"}
+                data-testid="button-follow"
+              >
+                {followUser.isPending ? "…" : isFollowing ? "Following" : "Follow"}
               </Button>
             )}
             {isOwnProfile && (
@@ -386,7 +423,22 @@ export default function Profile() {
                 onChange={(e) => setEditDisplayName(e.target.value)}
                 className="bg-input border-border"
                 placeholder="Your name"
+                data-testid="input-display-name"
               />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-white">Username</Label>
+              <div className="flex items-center gap-1.5 rounded-md border border-border bg-input px-3">
+                <span className="text-muted-foreground">@</span>
+                <Input
+                  value={editUsername}
+                  onChange={(e) => setEditUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+                  className="bg-transparent border-0 px-0 focus-visible:ring-0"
+                  placeholder="username"
+                  data-testid="input-username"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">Letters, numbers and underscores only. This is your unique @handle.</p>
             </div>
             <div className="space-y-2">
               <Label className="text-white">Bio</Label>

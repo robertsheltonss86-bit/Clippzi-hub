@@ -78,11 +78,38 @@ router.patch("/users/:id", async (req, res) => {
   try {
     const { id } = UpdateUserParams.parse({ id: Number(req.params.id) });
     const body = UpdateUserBody.parse(req.body);
-    const { role, ...rest } = body;
-    const [user] = await db.update(usersTable).set({
-      ...rest,
-      ...(role ? { role: role as "user" | "streamer" | "admin" } : {}),
-    }).where(eq(usersTable.id, id)).returning();
+    const { role, username, ...rest } = body;
+
+    let normalizedUsername: string | undefined;
+    if (username !== undefined) {
+      normalizedUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+      if (normalizedUsername.length < 3) {
+        return res.status(400).json({ error: "Username must be at least 3 characters (letters, numbers, underscores)." });
+      }
+      const [taken] = await db
+        .select({ id: usersTable.id })
+        .from(usersTable)
+        .where(and(eq(usersTable.username, normalizedUsername), sql`${usersTable.id} <> ${id}`));
+      if (taken) {
+        return res.status(409).json({ error: "That username is already taken." });
+      }
+    }
+
+    let user: typeof usersTable.$inferSelect | undefined;
+    try {
+      [user] = await db.update(usersTable).set({
+        ...rest,
+        ...(normalizedUsername ? { username: normalizedUsername } : {}),
+        ...(role ? { role: role as "user" | "streamer" | "admin" } : {}),
+      }).where(eq(usersTable.id, id)).returning();
+    } catch (e: any) {
+      // Postgres unique-violation (e.g. a concurrent request grabbed the same
+      // username between our check and this write) — surface it as a 409.
+      if (e?.code === "23505") {
+        return res.status(409).json({ error: "That username is already taken." });
+      }
+      throw e;
+    }
     if (!user) return res.status(404).json({ error: "User not found" });
     res.json(formatUser(user));
   } catch (e) {
@@ -97,15 +124,38 @@ router.post("/users/:id/follow", async (req, res) => {
     const body = FollowUserBody.parse(req.body);
     const { followerId, action } = body;
 
-    if (action === "follow") {
-      await db.insert(followsTable).values({ followerId, followingId: id }).onConflictDoNothing();
-      await db.update(usersTable).set({ followerCount: sql`${usersTable.followerCount} + 1` }).where(eq(usersTable.id, id));
-      await db.update(usersTable).set({ followingCount: sql`${usersTable.followingCount} + 1` }).where(eq(usersTable.id, followerId));
-    } else {
-      await db.delete(followsTable).where(and(eq(followsTable.followerId, followerId), eq(followsTable.followingId, id)));
-      await db.update(usersTable).set({ followerCount: sql`GREATEST(${usersTable.followerCount} - 1, 0)` }).where(eq(usersTable.id, id));
-      await db.update(usersTable).set({ followingCount: sql`GREATEST(${usersTable.followingCount} - 1, 0)` }).where(eq(usersTable.id, followerId));
+    if (followerId === id) {
+      return res.status(400).json({ error: "You cannot follow yourself" });
     }
+
+    // Do the row change and the counter updates atomically so concurrent
+    // follow/unfollow requests can't drift the counts out of sync.
+    await db.transaction(async (tx) => {
+      if (action === "follow") {
+        // Only bump the counts when a NEW follow row is actually created.
+        // Without this guard, tapping "follow" repeatedly kept inflating the
+        // counts even though onConflictDoNothing skipped the duplicate insert.
+        const inserted = await tx
+          .insert(followsTable)
+          .values({ followerId, followingId: id })
+          .onConflictDoNothing()
+          .returning();
+        if (inserted.length > 0) {
+          await tx.update(usersTable).set({ followerCount: sql`${usersTable.followerCount} + 1` }).where(eq(usersTable.id, id));
+          await tx.update(usersTable).set({ followingCount: sql`${usersTable.followingCount} + 1` }).where(eq(usersTable.id, followerId));
+        }
+      } else {
+        // Only decrement when a follow row actually existed and was removed.
+        const deleted = await tx
+          .delete(followsTable)
+          .where(and(eq(followsTable.followerId, followerId), eq(followsTable.followingId, id)))
+          .returning();
+        if (deleted.length > 0) {
+          await tx.update(usersTable).set({ followerCount: sql`GREATEST(${usersTable.followerCount} - 1, 0)` }).where(eq(usersTable.id, id));
+          await tx.update(usersTable).set({ followingCount: sql`GREATEST(${usersTable.followingCount} - 1, 0)` }).where(eq(usersTable.id, followerId));
+        }
+      }
+    });
 
     const [updated] = await db.select({ followerCount: usersTable.followerCount }).from(usersTable).where(eq(usersTable.id, id));
     res.json({ following: action === "follow", followerCount: updated?.followerCount ?? 0 });

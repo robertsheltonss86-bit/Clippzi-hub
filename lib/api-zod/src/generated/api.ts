@@ -185,6 +185,7 @@ export const UpdateUserParams = zod.object({
 })
 
 export const UpdateUserBody = zod.object({
+  "username": zod.string().optional(),
   "displayName": zod.string().optional(),
   "bio": zod.string().optional(),
   "avatarUrl": zod.string().optional(),

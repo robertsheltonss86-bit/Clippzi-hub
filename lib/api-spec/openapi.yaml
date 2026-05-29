@@ -1577,6 +1577,7 @@ components:
     UserUpdate:
       type: object
       properties:
+        username: { type: string }
         displayName: { type: string }
         bio: { type: string }
         avatarUrl: { type: string }
