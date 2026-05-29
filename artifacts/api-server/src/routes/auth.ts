@@ -101,6 +101,21 @@ router.get("/auth/user", (req: Request, res: Response) => {
   );
 });
 
+// Returns the current session token so the web client can persist it in
+// localStorage and send it as a Bearer token. This keeps users logged in on
+// iOS Safari / in-app browsers / home-screen PWAs where the session cookie is
+// frequently purged when the app is closed.
+router.get("/auth/session-token", (req: Request, res: Response) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ token: null });
+    return;
+  }
+  // Return the sid that actually authenticated this request (set by
+  // authMiddleware) so the client persists the currently-valid session id —
+  // not a stale Bearer token it may have sent.
+  res.json({ token: req.authSessionId ?? null });
+});
+
 router.get("/login", async (req: Request, res: Response) => {
   const config = await getOidcConfig();
   const callbackUrl = `${getOrigin(req)}/api/callback`;
