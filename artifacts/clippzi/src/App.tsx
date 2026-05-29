@@ -6,6 +6,7 @@ import NotFound from "@/pages/not-found";
 import { MainLayout } from "./components/layout/main-layout";
 
 import Home from "@/pages/home";
+import PostDetail from "@/pages/post-detail";
 import Explore from "@/pages/explore";
 import LiveBrowser from "@/pages/live-browser";
 import LiveStream from "@/pages/live-stream";
@@ -27,6 +28,7 @@ function Router() {
     <MainLayout>
       <Switch>
         <Route path="/" component={Home} />
+        <Route path="/p/:id" component={PostDetail} />
         <Route path="/explore" component={Explore} />
         <Route path="/live" component={LiveBrowser} />
         <Route path="/live/:id" component={LiveStream} />

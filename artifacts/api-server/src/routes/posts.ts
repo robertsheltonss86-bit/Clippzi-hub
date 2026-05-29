@@ -173,7 +173,9 @@ router.post("/posts/:id/share", async (req, res) => {
       .where(eq(postsTable.id, id))
       .returning({ shareCount: postsTable.shareCount });
     if (!post) return res.status(404).json({ error: "Post not found" });
-    res.json({ shareCount: post.shareCount, shareUrl: `https://clippzi.app/p/${id}` });
+    const host = (req.headers["x-forwarded-host"] as string) || req.get("host") || "clippzi.replit.app";
+    const proto = (req.headers["x-forwarded-proto"] as string) || req.protocol || "https";
+    res.json({ shareCount: post.shareCount, shareUrl: `${proto}://${host}/p/${id}` });
   } catch (e) {
     res.status(400).json({ error: String(e) });
   }

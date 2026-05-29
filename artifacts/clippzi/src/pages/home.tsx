@@ -92,7 +92,9 @@ export default function Home() {
   };
 
   const handleShare = (post: Post) => {
-    const shareUrl = `https://clippzi.app/p/${post.id}`;
+    // Build the link from the live origin so it always points at the real,
+    // working app (and lets messaging apps load the Clippzi preview card).
+    const shareUrl = `${window.location.origin}${import.meta.env.BASE_URL}p/${post.id}`;
     const shareData: ShareData = {
       title: `@${post.user?.username ?? "clippzi"} on Clippzi`,
       text: post.title ? `${post.title} — watch on Clippzi` : "Check out this video on Clippzi",
