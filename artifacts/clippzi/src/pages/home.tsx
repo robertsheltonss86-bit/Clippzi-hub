@@ -21,6 +21,9 @@ export default function Home() {
   const [likeDeltas, setLikeDeltas] = useState<Record<number, number>>({});
   const [shareDeltas, setShareDeltas] = useState<Record<number, number>>({});
   const [muted, setMuted] = useState(true);
+  // Mirror muted in a ref so the IntersectionObserver always reads the latest
+  // value without needing to be re-created on every toggle.
+  const mutedRef = useRef(true);
   const videoRefs = useRef<Map<number, HTMLVideoElement>>(new Map());
 
   // Play only the video currently scrolled into view; pause the rest so we
@@ -31,6 +34,7 @@ export default function Home() {
         entries.forEach((entry) => {
           const video = entry.target as HTMLVideoElement;
           if (entry.isIntersecting) {
+            video.muted = mutedRef.current;
             video.play().catch(() => {
               // iOS may block autoplay of an unmuted video when it scrolls
               // into view. Fall back to muted playback so the clip still plays.
@@ -50,12 +54,18 @@ export default function Home() {
     return () => observer.disconnect();
   }, [posts]);
 
-  const toggleMute = () => {
-    const next = !muted;
+  // Tapping a video toggles sound for the whole feed. We apply the change
+  // synchronously inside the tap gesture (iOS requirement) and make sure the
+  // tapped clip is actually playing so the audio is heard right away.
+  const toggleMute = (postId: number) => {
+    const next = !mutedRef.current;
+    mutedRef.current = next;
     setMuted(next);
-    // Apply synchronously inside the tap gesture so iOS allows unmuting.
-    videoRefs.current.forEach((v) => {
+    videoRefs.current.forEach((v, id) => {
       v.muted = next;
+      if (id === postId) {
+        v.play().catch(() => {});
+      }
     });
   };
 
@@ -169,15 +179,16 @@ export default function Home() {
                         videoRefs.current.delete(post.id);
                       }
                     }}
+                    onClick={() => toggleMute(post.id)}
                     src={post.mediaUrl}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover cursor-pointer"
                     loop
                     playsInline
                     data-testid={`video-post-${post.id}`}
                   />
                   <button
-                    onClick={toggleMute}
-                    className="absolute top-20 right-4 z-20 flex items-center gap-1.5 rounded-full bg-black/50 backdrop-blur-sm px-3 py-2 text-white active:scale-95 transition"
+                    onClick={() => toggleMute(post.id)}
+                    className="absolute top-20 right-4 z-30 flex items-center gap-1.5 rounded-full bg-black/50 backdrop-blur-sm px-3 py-2 text-white active:scale-95 transition"
                     data-testid={`button-mute-${post.id}`}
                     aria-label={muted ? "Unmute" : "Mute"}
                   >
