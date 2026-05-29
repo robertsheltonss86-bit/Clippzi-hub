@@ -1,4 +1,5 @@
 import { useGetFeed, getGetFeedQueryKey, useListLivestreams, useLikePost, useSharePost } from "@workspace/api-client-react";
+import type { Post } from "@workspace/api-client-react";
 import { Heart, MessageCircle, Share2, Play, Volume2, VolumeX } from "lucide-react";
 import { CommentsSheet } from "@/components/comments-sheet";
 import { useState, useRef, useEffect } from "react";
@@ -90,25 +91,51 @@ export default function Home() {
     );
   };
 
-  const handleShare = (postId: number) => {
-    setShareDeltas((d) => ({ ...d, [postId]: (d[postId] ?? 0) + 1 }));
+  const handleShare = (post: Post) => {
+    const shareUrl = `https://clippzi.app/p/${post.id}`;
+    const shareData: ShareData = {
+      title: `@${post.user?.username ?? "clippzi"} on Clippzi`,
+      text: post.title ? `${post.title} — watch on Clippzi` : "Check out this video on Clippzi",
+      url: shareUrl,
+    };
+
+    // Count the share in the background — don't block opening the share sheet.
+    setShareDeltas((d) => ({ ...d, [post.id]: (d[post.id] ?? 0) + 1 }));
     shareMutation.mutate(
-      { id: postId },
+      { id: post.id },
       {
-        onSuccess: async (data) => {
-          if (navigator.clipboard) {
-            navigator.clipboard.writeText(data.shareUrl).catch(() => {});
-          }
-          toast({ title: "Link copied!", description: data.shareUrl });
+        onSuccess: async () => {
           await queryClient.invalidateQueries({ queryKey: getGetFeedQueryKey() });
-          setShareDeltas((d) => ({ ...d, [postId]: 0 }));
+          setShareDeltas((d) => ({ ...d, [post.id]: 0 }));
         },
         onError: () => {
-          setShareDeltas((d) => ({ ...d, [postId]: Math.max(0, (d[postId] ?? 0) - 1) }));
-          toast({ title: "Couldn't share post", variant: "destructive" });
+          setShareDeltas((d) => ({ ...d, [post.id]: Math.max(0, (d[post.id] ?? 0) - 1) }));
         },
       },
     );
+
+    // Open the native share sheet (Messenger, Snapchat, Messages, etc.) on
+    // devices that support it. This must run synchronously inside the tap
+    // gesture, so it is not awaited behind the network request above.
+    const copyFallback = () => {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(shareUrl).catch(() => {});
+        toast({ title: "Link copied!", description: shareUrl });
+      }
+    };
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      navigator.share(shareData).catch((err) => {
+        // AbortError means the user simply dismissed the share sheet — leave
+        // it be. Any other error means sharing failed, so copy the link.
+        if (!(err instanceof DOMException && err.name === "AbortError")) {
+          copyFallback();
+        }
+      });
+    } else {
+      // Desktop / unsupported browsers: fall back to copying the link.
+      copyFallback();
+    }
   };
 
   if (isLoading) {
@@ -232,7 +259,7 @@ export default function Home() {
                 </button>
               </CommentsSheet>
 
-              <button onClick={() => handleShare(post.id)} className="flex flex-col items-center gap-1 group" data-testid={`button-share-${post.id}`}>
+              <button onClick={() => handleShare(post)} className="flex flex-col items-center gap-1 group" data-testid={`button-share-${post.id}`}>
                 <div className="w-12 h-12 rounded-full bg-black/40 flex items-center justify-center group-hover:bg-black/60 transition-colors">
                   <Share2 className="w-7 h-7 text-white group-hover:scale-110 transition-all duration-300" />
                 </div>
