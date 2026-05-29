@@ -48,9 +48,23 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   if (!sid) return next();
   const session = await getSession(sid);
   if (!session?.user?.id) { await clearSession(res, sid); return next(); }
+  // Try to refresh the OIDC access token, but do NOT log the user out if that
+  // fails. After login we only need the app identity stored in the session, and
+  // getSession() already enforces the session's own expiry. Previously, clearing
+  // the session whenever the short-lived OIDC token couldn't be refreshed logged
+  // users out roughly every hour ("every time I back out I have to log in again").
   const refreshed = await refreshIfExpired(sid, session);
-  if (!refreshed) { await clearSession(res, sid); return next(); }
-  req.user = refreshed.user;
+  const active = refreshed ?? session;
+  req.user = active.user;
+  // Slide the session expiry forward on activity so active users stay logged in
+  // until they explicitly log out. Throttle the DB write to at most ~twice a day
+  // per session to avoid a write on every request.
+  const nowSec = Math.floor(Date.now() / 1000);
+  const TOUCH_INTERVAL = 12 * 60 * 60;
+  if (!active.touched_at || nowSec - active.touched_at > TOUCH_INTERVAL) {
+    active.touched_at = nowSec;
+    void updateSession(sid, active).catch(() => {});
+  }
   next();
 }
 
