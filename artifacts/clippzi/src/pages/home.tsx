@@ -93,6 +93,23 @@ export default function Home() {
         )}
       </div>
 
+      {(!posts || posts.length === 0) && (
+        <div className="h-full w-full flex flex-col items-center justify-center gap-4 px-8 text-center">
+          <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
+            <Play className="w-9 h-9 text-primary" />
+          </div>
+          <h2 className="text-xl font-bold text-white">No videos yet</h2>
+          <p className="text-sm text-white/60 max-w-xs">
+            Be the first to post! Tap Create to share a video and get the feed going.
+          </p>
+          <Link href="/upload">
+            <button className="mt-2 px-6 py-3 rounded-full bg-primary text-black font-semibold">
+              Create a post
+            </button>
+          </Link>
+        </div>
+      )}
+
       {posts?.map((post) => {
         const liked = likedMap[post.id] ?? false;
         const likeCount = (post.likeCount ?? 0) + (likeDeltas[post.id] ?? 0);
