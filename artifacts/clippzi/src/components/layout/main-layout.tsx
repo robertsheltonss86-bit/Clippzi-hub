@@ -5,6 +5,43 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { Button } from "@/components/ui/button";
 import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useGetUser } from "@workspace/api-client-react";
+
+// A circular "my account" avatar that links straight to the signed-in user's
+// own profile, where they can edit their photo, banner, and bio. It prefers the
+// photo the user uploaded (app user avatarUrl), then their Replit profile photo,
+// then their initials.
+function ProfileBubble({
+  userId,
+  fallbackName,
+  fallbackImage,
+  className = "w-9 h-9",
+}: {
+  userId: number;
+  fallbackName?: string | null;
+  fallbackImage?: string | null;
+  className?: string;
+}) {
+  const { data: appUser } = useGetUser(userId);
+  const avatar = appUser?.avatarUrl || fallbackImage || null;
+  const name = appUser?.displayName || fallbackName || "?";
+  const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+  // Renders only the avatar visual — callers wrap it in a <Link> so we never
+  // nest anchors (which breaks click/focus/accessibility).
+  return (
+    <div
+      className={`${className} rounded-full overflow-hidden bg-muted flex items-center justify-center text-sm font-bold text-foreground cursor-pointer ring-2 ring-primary active:scale-95 transition`}
+      data-testid="button-profile-bubble"
+      title="My profile"
+    >
+      {avatar ? (
+        <img src={avatar} alt={name} className="w-full h-full object-cover" />
+      ) : (
+        <span>{initials}</span>
+      )}
+    </div>
+  );
+}
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -73,9 +110,20 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             <div className="h-9" />
           ) : isAuthenticated ? (
             <div className="space-y-2">
-              <div className="text-xs text-muted-foreground truncate" data-testid="text-current-user">
-                {user?.email || user?.firstName || "Signed in"}
-              </div>
+              {userId ? (
+                <Link href={profileHref}>
+                  <div className="flex items-center gap-2 cursor-pointer rounded-lg p-1 hover:bg-muted transition-colors" data-testid="link-profile-bubble">
+                    <ProfileBubble userId={userId} fallbackName={user?.firstName} fallbackImage={user?.profileImageUrl} />
+                    <div className="text-xs text-muted-foreground truncate flex-1" data-testid="text-current-user">
+                      {user?.email || user?.firstName || "View profile"}
+                    </div>
+                  </div>
+                </Link>
+              ) : (
+                <div className="text-xs text-muted-foreground truncate" data-testid="text-current-user">
+                  {user?.email || user?.firstName || "Signed in"}
+                </div>
+              )}
               <Button onClick={logout} variant="outline" size="sm" className="w-full" data-testid="button-logout">
                 <LogOut className="w-4 h-4 mr-2" /> Log out
               </Button>
@@ -95,12 +143,18 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
               <div className="cursor-pointer"><AnimatedLogo /></div>
             </Link>
             <div className="flex gap-4 items-center">
-              {!isLoading && (isAuthenticated ? (
-                <button onClick={logout} className="text-sm text-muted-foreground" data-testid="button-logout-mobile">Logout</button>
-              ) : (
-                <button onClick={login} className="text-sm font-semibold text-primary" data-testid="button-login-mobile">Login</button>
-              ))}
               <Link href="/notifications"><Bell className="w-6 h-6 text-foreground cursor-pointer" /></Link>
+              {!isLoading && (
+                isAuthenticated && userId ? (
+                  <Link href={profileHref} data-testid="link-profile-bubble-mobile">
+                    <ProfileBubble userId={userId} fallbackName={user?.firstName} fallbackImage={user?.profileImageUrl} className="w-8 h-8" />
+                  </Link>
+                ) : isAuthenticated ? (
+                  <button onClick={logout} className="text-sm text-muted-foreground" data-testid="button-logout-mobile">Logout</button>
+                ) : (
+                  <button onClick={login} className="text-sm font-semibold text-primary" data-testid="button-login-mobile">Login</button>
+                )
+              )}
             </div>
           </header>
         )}

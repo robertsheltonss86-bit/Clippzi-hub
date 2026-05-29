@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Camera, Edit2, CheckCircle, Heart, Play, Users, Video, Eye, BadgeCheck, DollarSign, Trash2 } from "lucide-react";
+import { Camera, Edit2, CheckCircle, Heart, Play, Users, Video, Eye, BadgeCheck, DollarSign, Trash2, LogOut } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 
 function StatBox({ label, value }: { label: string; value: string | number }) {
@@ -84,7 +84,7 @@ function UploadableImage({
 
 export default function Profile() {
   const params = useParams<{ id: string }>();
-  const { userId: meId, isAuthenticated, login } = useCurrentUser();
+  const { userId: meId, isAuthenticated, login, logout } = useCurrentUser();
   const userId = Number(params.id) || meId || 0;
   const isOwnProfile = !!meId && userId === meId;
   const [, setLocation] = useLocation();
@@ -227,7 +227,7 @@ export default function Profile() {
             )}
           </div>
 
-          <div className="flex gap-2 pb-1">
+          <div className="flex flex-wrap gap-2 pb-1 justify-end">
             {isOwnProfile ? (
               <Button onClick={openEdit} variant="outline" size="sm" className="gap-1.5 border-border">
                 <Edit2 className="w-3.5 h-3.5" /> Edit Profile
@@ -240,6 +240,11 @@ export default function Profile() {
             {isOwnProfile && (
               <Button onClick={() => setLocation(`/profile/${userId}/earnings`)} variant="outline" size="sm" className="gap-1.5 border-border">
                 <DollarSign className="w-3.5 h-3.5" /> Earnings
+              </Button>
+            )}
+            {isOwnProfile && (
+              <Button onClick={logout} variant="outline" size="sm" className="gap-1.5 border-border" data-testid="button-logout-profile">
+                <LogOut className="w-3.5 h-3.5" /> Log out
               </Button>
             )}
           </div>
