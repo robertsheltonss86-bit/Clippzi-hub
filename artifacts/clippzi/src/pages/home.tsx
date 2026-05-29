@@ -1,7 +1,7 @@
 import { useGetFeed, getGetFeedQueryKey, useListLivestreams, useLikePost, useSharePost } from "@workspace/api-client-react";
-import { Heart, MessageCircle, Share2, Play } from "lucide-react";
+import { Heart, MessageCircle, Share2, Play, Volume2, VolumeX } from "lucide-react";
 import { CommentsSheet } from "@/components/comments-sheet";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -20,6 +20,44 @@ export default function Home() {
   const [likedMap, setLikedMap] = useState<Record<number, boolean>>({});
   const [likeDeltas, setLikeDeltas] = useState<Record<number, number>>({});
   const [shareDeltas, setShareDeltas] = useState<Record<number, number>>({});
+  const [muted, setMuted] = useState(true);
+  const videoRefs = useRef<Map<number, HTMLVideoElement>>(new Map());
+
+  // Play only the video currently scrolled into view; pause the rest so we
+  // never get multiple clips playing audio at once.
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const video = entry.target as HTMLVideoElement;
+          if (entry.isIntersecting) {
+            video.play().catch(() => {
+              // iOS may block autoplay of an unmuted video when it scrolls
+              // into view. Fall back to muted playback so the clip still plays.
+              if (!video.muted) {
+                video.muted = true;
+                video.play().catch(() => {});
+              }
+            });
+          } else {
+            video.pause();
+          }
+        });
+      },
+      { threshold: 0.6 },
+    );
+    videoRefs.current.forEach((v) => observer.observe(v));
+    return () => observer.disconnect();
+  }, [posts]);
+
+  const toggleMute = () => {
+    const next = !muted;
+    setMuted(next);
+    // Apply synchronously inside the tap gesture so iOS allows unmuting.
+    videoRefs.current.forEach((v) => {
+      v.muted = next;
+    });
+  };
 
   const handleLike = (postId: number) => {
     if (!isAuthenticated || !userId) { login(); return; }
@@ -121,16 +159,32 @@ export default function Home() {
           >
             <div className="absolute inset-0 w-full h-full">
               {post.type === "video" && post.mediaUrl ? (
-                <video
-                  src={post.mediaUrl}
-                  className="w-full h-full object-cover"
-                  loop
-                  playsInline
-                  muted
-                  controls
-                  autoPlay
-                  data-testid={`video-post-${post.id}`}
-                />
+                <>
+                  <video
+                    ref={(el) => {
+                      if (el) {
+                        el.muted = muted;
+                        videoRefs.current.set(post.id, el);
+                      } else {
+                        videoRefs.current.delete(post.id);
+                      }
+                    }}
+                    src={post.mediaUrl}
+                    className="w-full h-full object-cover"
+                    loop
+                    playsInline
+                    data-testid={`video-post-${post.id}`}
+                  />
+                  <button
+                    onClick={toggleMute}
+                    className="absolute top-20 right-4 z-20 flex items-center gap-1.5 rounded-full bg-black/50 backdrop-blur-sm px-3 py-2 text-white active:scale-95 transition"
+                    data-testid={`button-mute-${post.id}`}
+                    aria-label={muted ? "Unmute" : "Mute"}
+                  >
+                    {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                    {muted && <span className="text-xs font-semibold">Tap for sound</span>}
+                  </button>
+                </>
               ) : (
                 <img
                   src={post.mediaUrl || "https://images.unsplash.com/photo-1549490349-8643362247b5"}
