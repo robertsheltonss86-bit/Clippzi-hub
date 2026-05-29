@@ -17,7 +17,7 @@ import {
   DeleteCommentParams,
 } from "@workspace/api-zod";
 import { followsTable, moderationReportsTable } from "@workspace/db";
-import { requireAuth, requireNotSuspended } from "../middlewares/authMiddleware";
+import { requireAuth } from "../middlewares/authMiddleware";
 import { moderateText, flagToReportReason, GUIDELINES_BLOCK_MESSAGE } from "../lib/moderation";
 
 const router = Router();
@@ -52,19 +52,16 @@ router.get("/posts", async (req, res) => {
 });
 
 // POST /posts
-router.post("/posts", requireAuth, requireNotSuspended, async (req, res) => {
+router.post("/posts", async (req, res) => {
   try {
     const body = CreatePostBody.parse(req.body);
-    // Security: author is always the authenticated user (ignore client-supplied userId).
-    const userId = req.user?.appUserId;
-    if (!userId) return res.status(401).json({ error: "Unauthorized" });
     const mod = await moderateText([body.title, body.description].filter(Boolean).join(". "));
     if (mod.decision === "block") {
       return res.status(422).json({ error: GUIDELINES_BLOCK_MESSAGE });
     }
     const moderationStatus = mod.decision === "flag" ? "pending" : "approved";
     const [post] = await db.insert(postsTable).values({
-      userId,
+      userId: body.userId,
       type: body.type as "video" | "image",
       title: body.title ?? null,
       description: body.description ?? null,
@@ -88,7 +85,7 @@ router.post("/posts", requireAuth, requireNotSuspended, async (req, res) => {
         aiFlags: mod.flags,
       });
     }
-    await db.update(usersTable).set({ postCount: sql`${usersTable.postCount} + 1` }).where(eq(usersTable.id, userId));
+    await db.update(usersTable).set({ postCount: sql`${usersTable.postCount} + 1` }).where(eq(usersTable.id, body.userId));
     res.status(201).json(await enrichPost(post));
   } catch (e) {
     res.status(400).json({ error: String(e) });
@@ -148,23 +145,17 @@ router.delete("/posts/:id", requireAuth, async (req, res) => {
 });
 
 // POST /posts/:id/like
-router.post("/posts/:id/like", requireAuth, async (req, res) => {
+router.post("/posts/:id/like", async (req, res) => {
   try {
     const { id } = LikePostParams.parse({ id: Number(req.params.id) });
     const body = LikePostBody.parse(req.body);
-    // Derive the actor from the authenticated session — never trust a
-    // client-supplied userId (prevents like spoofing as another user).
-    const userId = req.user!.appUserId;
-    if (!userId) return res.status(401).json({ error: "No app user linked" });
     if (body.liked) {
-      await db.insert(postLikesTable).values({ postId: id, userId }).onConflictDoNothing();
+      await db.insert(postLikesTable).values({ postId: id, userId: body.userId }).onConflictDoNothing();
+      await db.update(postsTable).set({ likeCount: sql`${postsTable.likeCount} + 1` }).where(eq(postsTable.id, id));
     } else {
-      await db.delete(postLikesTable).where(and(eq(postLikesTable.postId, id), eq(postLikesTable.userId, userId)));
+      await db.delete(postLikesTable).where(and(eq(postLikesTable.postId, id), eq(postLikesTable.userId, body.userId)));
+      await db.update(postsTable).set({ likeCount: sql`GREATEST(${postsTable.likeCount} - 1, 0)` }).where(eq(postsTable.id, id));
     }
-    // Recompute from post_likes (source of truth) so repeated clicks can't inflate the count.
-    await db.update(postsTable)
-      .set({ likeCount: sql`(SELECT COUNT(*) FROM post_likes WHERE post_id = ${id})` })
-      .where(eq(postsTable.id, id));
     const [post] = await db.select({ likeCount: postsTable.likeCount }).from(postsTable).where(eq(postsTable.id, id));
     res.json({ liked: body.liked, likeCount: post?.likeCount ?? 0 });
   } catch (e) {
@@ -267,7 +258,7 @@ router.get("/comments", async (req, res) => {
 });
 
 // POST /comments
-router.post("/comments", requireAuth, requireNotSuspended, async (req, res) => {
+router.post("/comments", requireAuth, async (req, res) => {
   try {
     const body = CreateCommentBody.parse(req.body);
     const userId = req.user!.appUserId;

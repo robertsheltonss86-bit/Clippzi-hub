@@ -9,15 +9,11 @@ export default function CheckoutSuccess() {
   const { isAuthenticated, isLoading, login } = useCurrentUser();
   const [status, setStatus] = useState<"loading" | "ok" | "error" | "needs-login">("loading");
   const [error, setError] = useState<string>("");
-  const [isCoins, setIsCoins] = useState(false);
-  const [coinsAdded, setCoinsAdded] = useState<number | null>(null);
 
   useEffect(() => {
     if (isLoading) return;
     const params = new URLSearchParams(window.location.search);
     const sessionId = params.get("session_id");
-    const coins = params.get("type") === "coins";
-    setIsCoins(coins);
     if (!sessionId) {
       setStatus("error");
       setError("Missing session_id");
@@ -28,8 +24,7 @@ export default function CheckoutSuccess() {
       return;
     }
     const base = import.meta.env.BASE_URL;
-    const endpoint = coins ? "api/checkout/coins/confirm" : "api/checkout/gift/confirm";
-    fetch(`${base}${endpoint}`, {
+    fetch(`${base}api/checkout/gift/confirm`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -37,9 +32,7 @@ export default function CheckoutSuccess() {
     })
       .then(async (r) => {
         if (r.status === 401) { setStatus("needs-login"); return; }
-        const data = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(data.error ?? `HTTP ${r.status}`);
-        if (coins && typeof data.coinsAdded === "number") setCoinsAdded(data.coinsAdded);
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`);
         setStatus("ok");
       })
       .catch((e) => {
@@ -54,26 +47,15 @@ export default function CheckoutSuccess() {
         {status === "loading" && (
           <>
             <Loader2 className="w-12 h-12 mx-auto text-primary animate-spin" />
-            <h2 className="text-xl font-bold">{isCoins ? "Adding your coins…" : "Confirming your gift…"}</h2>
+            <h2 className="text-xl font-bold">Confirming your gift…</h2>
             <p className="text-muted-foreground text-sm">Hang tight — we're recording the transaction.</p>
           </>
         )}
         {status === "ok" && (
           <>
             <CheckCircle2 className="w-12 h-12 mx-auto text-green-500" data-testid="text-checkout-success" />
-            {isCoins ? (
-              <>
-                <h2 className="text-xl font-bold">Coins added! 🪙</h2>
-                <p className="text-muted-foreground" data-testid="text-coins-added">
-                  {coinsAdded != null ? `${coinsAdded.toLocaleString()} coins are now in your wallet.` : "Your coins are now in your wallet."}
-                </p>
-              </>
-            ) : (
-              <>
-                <h2 className="text-xl font-bold">Gift sent! 🎁</h2>
-                <p className="text-muted-foreground">Thank you for supporting the creator.</p>
-              </>
-            )}
+            <h2 className="text-xl font-bold">Gift sent! 🎁</h2>
+            <p className="text-muted-foreground">Thank you for supporting the creator.</p>
             <Button onClick={() => setLocation("/")} className="w-full" data-testid="button-back-home">Back to feed</Button>
           </>
         )}

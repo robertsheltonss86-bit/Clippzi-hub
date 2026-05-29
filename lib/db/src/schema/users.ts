@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, boolean, timestamp, pgEnum, unique } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -19,14 +19,9 @@ export const usersTable = pgTable("users", {
   postCount: integer("post_count").notNull().default(0),
   totalViews: integer("total_views").notNull().default(0),
   role: userRoleEnum("role").notNull().default("user"),
-  coinBalance: integer("coin_balance").notNull().default(0),
   stripeAccountId: text("stripe_account_id"),
   stripePayoutsEnabled: boolean("stripe_payouts_enabled").notNull().default(false),
   authUserId: text("auth_user_id").unique(),
-  suspendedUntil: timestamp("suspended_until"),
-  isBanned: boolean("is_banned").notNull().default(false),
-  offenseCount: integer("offense_count").notNull().default(0),
-  suspensionReason: text("suspension_reason"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -35,9 +30,7 @@ export const followsTable = pgTable("follows", {
   followerId: integer("follower_id").notNull().references(() => usersTable.id),
   followingId: integer("following_id").notNull().references(() => usersTable.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  uniqFollow: unique("follows_follower_following_unique").on(t.followerId, t.followingId),
-}));
+});
 
 export const bankAccountsTable = pgTable("bank_accounts", {
   id: serial("id").primaryKey(),

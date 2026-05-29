@@ -135,10 +135,6 @@ export const ListUsersResponseItem = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 })
 export const ListUsersResponse = zod.array(ListUsersResponseItem)
@@ -177,10 +173,6 @@ export const GetUserResponse = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -214,10 +206,6 @@ export const UpdateUserResponse = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -261,10 +249,6 @@ export const GetUserFollowersResponseItem = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 })
 export const GetUserFollowersResponse = zod.array(GetUserFollowersResponseItem)
@@ -291,10 +275,6 @@ export const GetUserFollowingResponseItem = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 })
 export const GetUserFollowingResponse = zod.array(GetUserFollowingResponseItem)
@@ -363,10 +343,6 @@ export const GetUserEarningsResponse = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "receiverId": zod.number(),
@@ -384,10 +360,6 @@ export const GetUserEarningsResponse = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "streamId": zod.number().nullish(),
@@ -542,10 +514,6 @@ export const ListPostsResponseItem = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "type": zod.enum(['video', 'image']),
@@ -613,10 +581,6 @@ export const GetTrendingPostsResponseItem = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "type": zod.enum(['video', 'image']),
@@ -664,10 +628,6 @@ export const GetPostResponse = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "type": zod.enum(['video', 'image']),
@@ -758,10 +718,6 @@ export const GetFeedResponseItem = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "type": zod.enum(['video', 'image']),
@@ -814,10 +770,6 @@ export const GetFollowingFeedResponseItem = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "type": zod.enum(['video', 'image']),
@@ -864,10 +816,6 @@ export const GetFeedStatsResponse = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 })).optional(),
   "trendingTags": zod.array(zod.string()).optional()
@@ -900,10 +848,6 @@ export const ListLivestreamsResponseItem = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "title": zod.string(),
@@ -965,10 +909,6 @@ export const GetLivestreamResponse = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "title": zod.string(),
@@ -1025,10 +965,6 @@ export const UpdateLivestreamResponse = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "title": zod.string(),
@@ -1077,10 +1013,6 @@ export const LikeLivestreamResponse = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "title": zod.string(),
@@ -1130,10 +1062,6 @@ export const ListLiveChatResponseItem = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "message": zod.string(),
@@ -1187,10 +1115,6 @@ export const StartBattleResponse = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "title": zod.string(),
@@ -1239,10 +1163,6 @@ export const EndBattleResponse = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "title": zod.string(),
@@ -1295,10 +1215,6 @@ export const AddBattleScoreResponse = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "title": zod.string(),
@@ -1347,10 +1263,6 @@ export const GetLivestreamViewersResponse = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }))
 })
@@ -1455,10 +1367,6 @@ export const ListGiftTransactionsResponseItem = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "receiverId": zod.number(),
@@ -1476,10 +1384,6 @@ export const ListGiftTransactionsResponseItem = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "streamId": zod.number().nullish(),
@@ -1519,10 +1423,6 @@ export const GetGiftLeaderboardResponseItem = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }),
   "totalAmount": zod.number(),
@@ -1562,10 +1462,6 @@ export const ListShopProductsResponseItem = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "title": zod.string(),
@@ -1625,10 +1521,6 @@ export const GetShopProductResponse = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "title": zod.string(),
@@ -1679,10 +1571,6 @@ export const UpdateShopProductResponse = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "title": zod.string(),
@@ -1738,10 +1626,6 @@ export const ListShopOrdersResponseItem = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "title": zod.string(),
@@ -1773,10 +1657,6 @@ export const ListShopOrdersResponseItem = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "sellerId": zod.number(),
@@ -1834,10 +1714,6 @@ export const UpdateShopOrderResponse = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "title": zod.string(),
@@ -1869,10 +1745,6 @@ export const UpdateShopOrderResponse = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "sellerId": zod.number(),
@@ -1912,10 +1784,6 @@ export const GetTrendingShopProductsResponseItem = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "title": zod.string(),
@@ -1963,10 +1831,6 @@ export const ListCommentsResponseItem = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "text": zod.string(),
@@ -2066,10 +1930,6 @@ export const ListModerationReportsResponseItem = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "contentType": zod.enum(['post', 'comment', 'user', 'stream']),
@@ -2089,7 +1949,7 @@ export const ListModerationReportsResponse = zod.array(ListModerationReportsResp
  * @summary Report content for moderation
  */
 export const CreateModerationReportBody = zod.object({
-  "reporterId": zod.number().optional(),
+  "reporterId": zod.number(),
   "contentType": zod.enum(['post', 'comment', 'user', 'stream']),
   "contentId": zod.number(),
   "reason": zod.enum(['bullying', 'harassment', 'drugs', 'spam', 'nudity', 'violence', 'other']),
@@ -2147,10 +2007,6 @@ export const ResolveModerationReportResponse = zod.object({
   "postCount": zod.number().optional(),
   "totalViews": zod.number().optional(),
   "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 }).optional(),
   "contentType": zod.enum(['post', 'comment', 'user', 'stream']),
@@ -2161,41 +2017,6 @@ export const ResolveModerationReportResponse = zod.object({
   "aiScore": zod.number().nullish(),
   "aiFlags": zod.array(zod.string()).optional(),
   "resolvedAt": zod.string().nullish(),
-  "createdAt": zod.string()
-})
-
-
-/**
- * @summary Apply an escalating suspension, lifetime ban, or clear a user (admin only)
- */
-export const ModerateUserParams = zod.object({
-  "id": zod.coerce.number()
-})
-
-export const ModerateUserBody = zod.object({
-  "action": zod.enum(['suspend', 'ban', 'clear']),
-  "reportId": zod.number().optional(),
-  "reason": zod.string().optional()
-})
-
-export const ModerateUserResponse = zod.object({
-  "id": zod.number(),
-  "username": zod.string(),
-  "displayName": zod.string(),
-  "bio": zod.string().nullish(),
-  "avatarUrl": zod.string().nullish(),
-  "bannerUrl": zod.string().nullish(),
-  "isVerified": zod.boolean().optional(),
-  "isLive": zod.boolean().optional(),
-  "followerCount": zod.number().optional(),
-  "followingCount": zod.number().optional(),
-  "postCount": zod.number().optional(),
-  "totalViews": zod.number().optional(),
-  "role": zod.enum(['user', 'streamer', 'admin']).optional(),
-  "suspendedUntil": zod.string().nullish(),
-  "isBanned": zod.boolean().optional(),
-  "offenseCount": zod.number().optional(),
-  "suspensionReason": zod.string().nullish(),
   "createdAt": zod.string()
 })
 

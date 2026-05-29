@@ -7,12 +7,10 @@ import {
   CreateModerationReportBody,
   ResolveModerationReportParams,
   ResolveModerationReportBody,
-  ModerateUserBody,
   ListNotificationsQueryParams,
   MarkNotificationReadParams,
   MarkNotificationReadBody,
 } from "@workspace/api-zod";
-import { requireAuth, requireAdmin } from "../middlewares/authMiddleware";
 
 const router = Router();
 
@@ -50,7 +48,7 @@ function analyzeText(text: string) {
 }
 
 // GET /moderation/reports
-router.get("/moderation/reports", requireAdmin, async (req, res) => {
+router.get("/moderation/reports", async (req, res) => {
   try {
     const query = ListModerationReportsQueryParams.parse(req.query);
     let q = db.select().from(moderationReportsTable).$dynamic();
@@ -76,13 +74,11 @@ router.get("/moderation/reports", requireAdmin, async (req, res) => {
 });
 
 // POST /moderation/reports
-router.post("/moderation/reports", requireAuth, async (req, res) => {
+router.post("/moderation/reports", async (req, res) => {
   try {
     const body = CreateModerationReportBody.parse(req.body);
-    // Trust the authenticated session for the reporter identity, not the client payload.
-    const reporterId = req.user?.appUserId ?? body.reporterId ?? null;
     const [report] = await db.insert(moderationReportsTable).values({
-      reporterId,
+      reporterId: body.reporterId,
       contentType: body.contentType as "post" | "comment" | "user" | "stream",
       contentId: body.contentId,
       reason: body.reason as "bullying" | "harassment" | "drugs" | "spam" | "nudity" | "violence" | "other",
@@ -120,7 +116,7 @@ router.post("/moderation/analyze", async (req, res) => {
 });
 
 // PATCH /moderation/reports/:id
-router.patch("/moderation/reports/:id", requireAdmin, async (req, res) => {
+router.patch("/moderation/reports/:id", async (req, res) => {
   try {
     const { id } = ResolveModerationReportParams.parse({ id: Number(req.params.id) });
     const body = ResolveModerationReportBody.parse(req.body);
@@ -161,70 +157,6 @@ router.patch("/moderation/reports/:id", requireAdmin, async (req, res) => {
       reporter: reporter ? { ...reporter, createdAt: reporter.createdAt.toISOString() } : null,
       createdAt: report.createdAt.toISOString(),
       resolvedAt: report.resolvedAt?.toISOString() ?? null,
-    });
-  } catch (e) {
-    res.status(400).json({ error: String(e) });
-  }
-});
-
-// POST /moderation/users/:id/action — admin applies escalating suspension, lifetime ban, or clears a user.
-router.post("/moderation/users/:id/action", requireAdmin, async (req, res) => {
-  try {
-    const userId = Number(req.params.id);
-    if (!Number.isInteger(userId)) return res.status(400).json({ error: "Invalid user id" });
-    const body = ModerateUserBody.parse(req.body);
-    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    // If a report drives this action, verify it targets this user and is still pending.
-    // This prevents replaying the same report to inflate the offense count or resolving an unrelated report.
-    if (body.reportId != null) {
-      const [report] = await db.select().from(moderationReportsTable).where(eq(moderationReportsTable.id, body.reportId));
-      if (!report) return res.status(404).json({ error: "Report not found" });
-      if (report.contentType !== "user" || report.contentId !== userId) {
-        return res.status(400).json({ error: "Report does not match this user" });
-      }
-      if (report.status !== "pending") {
-        return res.status(409).json({ error: "Report has already been resolved" });
-      }
-    }
-
-    let updates: Partial<typeof usersTable.$inferInsert>;
-    if (body.action === "ban") {
-      updates = {
-        isBanned: true,
-        suspendedUntil: null,
-        offenseCount: user.offenseCount + 1,
-        suspensionReason: body.reason ?? "Severe violation of Clippzi community guidelines",
-      };
-    } else if (body.action === "suspend") {
-      const newCount = user.offenseCount + 1;
-      const hours = newCount === 1 ? 1 : newCount === 2 ? 5 : 24;
-      updates = {
-        isBanned: false,
-        offenseCount: newCount,
-        suspendedUntil: new Date(Date.now() + hours * 60 * 60 * 1000),
-        suspensionReason: body.reason ?? "Violation of Clippzi community guidelines",
-      };
-    } else {
-      // clear — restore access (admin decided it wasn't bad enough).
-      updates = { isBanned: false, suspendedUntil: null, suspensionReason: null };
-    }
-
-    const [updated] = await db.update(usersTable).set(updates).where(eq(usersTable.id, userId)).returning();
-
-    if (body.reportId) {
-      await db.update(moderationReportsTable).set({
-        status: body.action === "clear" ? "dismissed" : "actioned",
-        resolvedAt: new Date(),
-      }).where(eq(moderationReportsTable.id, body.reportId));
-    }
-
-    res.json({
-      ...updated,
-      role: updated.role ?? "user",
-      suspendedUntil: updated.suspendedUntil?.toISOString() ?? null,
-      createdAt: updated.createdAt.toISOString(),
     });
   } catch (e) {
     res.status(400).json({ error: String(e) });

@@ -5,5 +5,4 @@ export * from "./gifts";
 export * from "./shop";
 export * from "./moderation";
 export * from "./payouts";
-export * from "./coins";
 export * from "./auth";
