@@ -24,6 +24,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useCoinBalance, useCoinActions, coinsForUsd } from "@/hooks/use-coins";
+import { GiftPayBar } from "@/components/gift-pay-bar";
+import { GiftAnimationOverlay, type GiftAnimationPayload } from "@/components/gift-animation-overlay";
+import { Coins } from "lucide-react";
 import { LiveKitBroadcaster, LiveKitViewer } from "@/components/live/livekit-stage";
 import { GroupRoomProvider, LiveKitGroupStage } from "@/components/live/livekit-group-room";
 import { CohostPanel } from "@/components/live/cohost-panel";
@@ -50,13 +54,18 @@ function colorForUser(id: number) {
 }
 
 export default function LiveStream() {
-  const { userId: CURRENT_USER_ID, isAuthenticated, login } = useCurrentUser();
+  const { userId: CURRENT_USER_ID, isAuthenticated, isLoading: authLoading, login, user } = useCurrentUser();
   const { id } = useParams();
   const streamId = parseInt(id || "0");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
   const [endingStream, setEndingStream] = useState(false);
+  const { data: coinBalance } = useCoinBalance();
+  const { sendGiftWithCoins } = useCoinActions();
+  const [payWithCoins, setPayWithCoins] = useState(true);
+  const [sendingGiftId, setSendingGiftId] = useState<number | null>(null);
+  const [giftAnim, setGiftAnim] = useState<GiftAnimationPayload | null>(null);
 
   const endLiveStream = async (silent = false) => {
     if (!streamId) return;
@@ -187,23 +196,58 @@ export default function LiveStream() {
     });
   };
 
-  const handleSendGift = async (giftId: number, name: string, price: number) => {
+  const playGiftAnimation = (gift: { name: string; emoji?: string | null; iconUrl?: string | null; rarity?: string | null }) => {
+    setGiftAnim({
+      key: Date.now(),
+      name: gift.name,
+      emoji: gift.emoji,
+      iconUrl: gift.iconUrl,
+      rarity: gift.rarity ?? "common",
+      senderName: user?.firstName || "You",
+    });
+  };
+
+  const handleSendGift = async (gift: { id: number; name: string; price: number; emoji?: string | null; iconUrl?: string | null; rarity?: string | null }) => {
+    if (authLoading) return;
     if (!isAuthenticated || !CURRENT_USER_ID) { login(); return; }
     if (!stream?.userId) return;
+    const price = Number(gift.price);
+
+    if (payWithCoins) {
+      const cost = coinsForUsd(price);
+      if ((coinBalance ?? 0) < cost) {
+        toast({ title: "Not enough coins", description: `You need ${cost.toLocaleString()} coins. Tap “Buy Coins” to top up.`, variant: "destructive" });
+        return;
+      }
+      if (sendingGiftId) return;
+      setSendingGiftId(gift.id);
+      try {
+        await sendGiftWithCoins({ giftId: gift.id, receiverId: stream.userId, streamId });
+        playGiftAnimation(gift);
+        queryClient.invalidateQueries({ queryKey: getGetLivestreamQueryKey(streamId) });
+        toast({ title: `Sent ${gift.name}! 🎁`, description: `${cost.toLocaleString()} coins spent` });
+      } catch (e: any) {
+        toast({ title: "Couldn't send gift", description: String(e?.message ?? e), variant: "destructive" });
+      } finally {
+        setSendingGiftId(null);
+      }
+      return;
+    }
+
     try {
       const base = import.meta.env.BASE_URL;
       const r = await fetch(`${base}api/checkout/gift`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ giftId, receiverId: stream.userId, streamId, quantity: 1 }),
+        body: JSON.stringify({ giftId: gift.id, receiverId: stream.userId, streamId, quantity: 1 }),
       });
       const data = await r.json();
       if (!r.ok || !data.url) {
         toast({ title: "Checkout failed", description: data.error ?? `HTTP ${r.status}`, variant: "destructive" });
         return;
       }
-      toast({ title: "Opening Stripe Checkout…", description: `Pay $${price.toFixed(2)} to send ${name}` });
+      toast({ title: "Opening Stripe Checkout…", description: `Pay $${price.toFixed(2)} to send ${gift.name}` });
       window.location.href = data.url;
     } catch (e: any) {
       toast({ title: "Checkout failed", description: String(e?.message ?? e), variant: "destructive" });
@@ -211,6 +255,7 @@ export default function LiveStream() {
   };
 
   const submitReport = () => {
+    if (authLoading) return;
     if (!isAuthenticated || !CURRENT_USER_ID) { login(); return; }
     if (!stream?.userId) return;
     reportMutation.mutate(
@@ -238,6 +283,7 @@ export default function LiveStream() {
   const handleSendChat = () => {
     const msg = chatInput.trim();
     if (!msg) return;
+    if (authLoading) return;
     if (!isAuthenticated || !CURRENT_USER_ID) { login(); return; }
     setChatInput("");
     sendChatMutation.mutate(
@@ -394,6 +440,7 @@ export default function LiveStream() {
 
   return (
     <div className="flex flex-col lg:flex-row h-full w-full bg-black overflow-hidden relative">
+      <GiftAnimationOverlay gift={giftAnim} onDone={() => setGiftAnim(null)} />
       <div className="flex-1 relative bg-black flex flex-col justify-center items-center h-full">
         {battleActive ? (
           <div className="absolute inset-0 grid grid-cols-2 gap-0">
@@ -680,22 +727,31 @@ export default function LiveStream() {
                 <SheetHeader>
                   <SheetTitle className="text-white flex items-center gap-2"><span className="text-xl">🎁</span> Gift Chest</SheetTitle>
                 </SheetHeader>
-                <p className="text-xs text-muted-foreground mt-1 mb-3">
+                <p className="text-xs text-muted-foreground mt-1 mb-2">
                   {isOwnStream
                     ? `Send gifts to your co-hosts to hype them up${battleActive ? " • adds to battle score" : ""}`
                     : `60/40 split — creator keeps 60%${battleActive ? " • adds to battle score" : ""}`}
                 </p>
+                <GiftPayBar
+                  payWithCoins={payWithCoins}
+                  setPayWithCoins={setPayWithCoins}
+                  balance={coinBalance ?? 0}
+                />
                   <ScrollArea className="flex-1">
                     <div className="grid grid-cols-3 gap-2 pb-4">
                       {gifts?.map((gift) => (
-                        <button key={gift.id} onClick={() => handleSendGift(gift.id, gift.name, Number(gift.price))} className={`flex flex-col items-center justify-center p-2 rounded-lg bg-black/60 border-2 transition-all hover:scale-105 hover:bg-zinc-800 ${getRarityColor(gift.rarity)}`} data-testid={`button-gift-mobile-${gift.id}`}>
+                        <button type="button" key={gift.id} onClick={() => handleSendGift({ ...gift, price: Number(gift.price) })} disabled={sendingGiftId === gift.id} className={`relative flex flex-col items-center justify-center p-2 rounded-lg bg-gradient-to-b from-zinc-800/70 to-black/70 border-2 transition-all hover:scale-105 hover:bg-zinc-800 disabled:opacity-60 ${getRarityColor(gift.rarity)}`} data-testid={`button-gift-mobile-${gift.id}`}>
                           {gift.iconUrl ? (
                             <img src={gift.iconUrl} alt={gift.name} className="w-16 h-16 object-contain mb-1 drop-shadow-[0_0_8px_rgba(0,0,0,0.6)]" loading="lazy" />
                           ) : (
                             <span className="text-4xl mb-1 drop-shadow-md">{gift.emoji}</span>
                           )}
                           <span className="text-[10px] text-white font-medium truncate w-full text-center">{gift.name}</span>
-                          <span className="text-[10px] text-primary font-bold">${Number(gift.price).toFixed(2)}</span>
+                          {payWithCoins ? (
+                            <span className="text-[10px] text-amber-400 font-bold flex items-center gap-0.5"><Coins className="w-2.5 h-2.5" />{coinsForUsd(Number(gift.price)).toLocaleString()}</span>
+                          ) : (
+                            <span className="text-[10px] text-primary font-bold">${Number(gift.price).toFixed(2)}</span>
+                          )}
                         </button>
                       ))}
                     </div>
@@ -749,22 +805,32 @@ export default function LiveStream() {
             <div className="text-lg font-bold text-primary">${Number(stream?.totalGiftsReceived ?? 0).toFixed(2)}</div>
           </div>
         ) : (
-          <div className="h-44 border-t border-border bg-black/40 p-2 flex flex-col gap-2">
+          <div className="h-56 border-t border-border bg-black/40 p-2 flex flex-col gap-2">
             <div className="flex items-center justify-between px-2 text-xs font-semibold text-muted-foreground uppercase">
               <span>Send Gifts {battleActive ? "(adds to battle score)" : ""}</span>
               <span className="text-primary flex items-center gap-1"><GiftIcon className="w-3 h-3" /> 60/40 split</span>
             </div>
+            <GiftPayBar
+              payWithCoins={payWithCoins}
+              setPayWithCoins={setPayWithCoins}
+              balance={coinBalance ?? 0}
+              compact
+            />
             <ScrollArea className="flex-1">
               <div className="grid grid-cols-4 gap-2 pb-2">
                 {gifts?.map((gift) => (
-                  <button key={gift.id} onClick={() => handleSendGift(gift.id, gift.name, Number(gift.price))} className={`flex flex-col items-center justify-center p-2 rounded-lg bg-black/60 border-2 transition-all hover:scale-105 hover:bg-zinc-800 ${getRarityColor(gift.rarity)}`} data-testid={`button-gift-${gift.id}`}>
+                  <button type="button" key={gift.id} onClick={() => handleSendGift({ ...gift, price: Number(gift.price) })} disabled={sendingGiftId === gift.id} className={`relative flex flex-col items-center justify-center p-2 rounded-lg bg-gradient-to-b from-zinc-800/70 to-black/70 border-2 transition-all hover:scale-105 hover:bg-zinc-800 disabled:opacity-60 ${getRarityColor(gift.rarity)}`} data-testid={`button-gift-${gift.id}`}>
                     {gift.iconUrl ? (
                       <img src={gift.iconUrl} alt={gift.name} className="w-12 h-12 object-contain mb-1 drop-shadow-[0_0_8px_rgba(0,0,0,0.6)]" loading="lazy" />
                     ) : (
                       <span className="text-2xl mb-1 drop-shadow-md">{gift.emoji}</span>
                     )}
                     <span className="text-[10px] text-white font-medium truncate w-full text-center">{gift.name}</span>
-                    <span className="text-[10px] text-primary font-bold">${Number(gift.price).toFixed(2)}</span>
+                    {payWithCoins ? (
+                      <span className="text-[10px] text-amber-400 font-bold flex items-center gap-0.5"><Coins className="w-2.5 h-2.5" />{coinsForUsd(Number(gift.price)).toLocaleString()}</span>
+                    ) : (
+                      <span className="text-[10px] text-primary font-bold">${Number(gift.price).toFixed(2)}</span>
+                    )}
                   </button>
                 ))}
               </div>
