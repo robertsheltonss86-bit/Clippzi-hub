@@ -486,14 +486,55 @@ export default function LiveStream() {
 
         {/* TIKTOK-STYLE RIGHT RAIL — vertical action stack, above chat overlay */}
         <div className="pointer-events-auto absolute right-2 z-40 flex flex-col items-center gap-3" style={{ bottom: "42%" }}>
-          {!isOwnStream && (
-            <button onClick={handleShare} className="flex flex-col items-center gap-0.5 group" data-testid="button-share-stream" title="Share">
-              <div className="w-11 h-11 rounded-full bg-black/60 backdrop-blur border border-white/10 flex items-center justify-center group-active:scale-95 transition-transform">
-                <Share2 className="w-5 h-5 text-white" />
+          <button onClick={handleShare} className="flex flex-col items-center gap-0.5 group" data-testid="button-share-stream" title="Share">
+            <div className="w-11 h-11 rounded-full bg-black/60 backdrop-blur border border-white/10 flex items-center justify-center group-active:scale-95 transition-transform">
+              <Share2 className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-[10px] text-white font-semibold drop-shadow">Share</span>
+          </button>
+          <Sheet>
+            <SheetTrigger asChild>
+              <button className="flex flex-col items-center gap-0.5 group" data-testid="button-whos-live" title="Who's live">
+                <div className="w-11 h-11 rounded-full bg-black/60 backdrop-blur border border-white/10 flex items-center justify-center group-active:scale-95 transition-transform relative">
+                  <Radio className="w-5 h-5 text-secondary" />
+                  {otherStreams.length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-secondary text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                      {otherStreams.length}
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] text-white font-semibold drop-shadow">Live now</span>
+              </button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="bg-card border-border h-auto max-h-[65vh]">
+              <SheetHeader>
+                <SheetTitle className="text-white flex items-center gap-2"><Radio className="w-5 h-5 text-secondary" /> Live now</SheetTitle>
+              </SheetHeader>
+              <div className="flex flex-col gap-2 mt-3 pb-4 overflow-y-auto">
+                {otherStreams.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-6 text-center">No one else is live right now.</p>
+                ) : (
+                  otherStreams.map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => setLocation(`/live/${s.id}`)}
+                      className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 active:scale-[0.99] transition cursor-pointer text-left w-full"
+                      data-testid={`whos-live-${s.id}`}
+                    >
+                      <div className="relative shrink-0">
+                        <img src={s.user?.avatarUrl || "/assets/avatar1.png"} alt="" className="w-12 h-12 rounded-full object-cover border-2 border-secondary" />
+                        <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-secondary text-white text-[8px] font-bold px-1 rounded-sm uppercase">LIVE</span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-white truncate">{s.user?.displayName}</p>
+                        <p className="text-xs text-muted-foreground truncate">{s.title || "Live stream"}</p>
+                      </div>
+                    </button>
+                  ))
+                )}
               </div>
-              <span className="text-[10px] text-white font-semibold drop-shadow">Share</span>
-            </button>
-          )}
+            </SheetContent>
+          </Sheet>
           {(isOwnStream || isGroup) && (
             <CohostPanel streamId={streamId} isHost={isOwnStream} />
           )}

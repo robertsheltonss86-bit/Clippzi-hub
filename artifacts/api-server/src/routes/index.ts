@@ -12,6 +12,7 @@ import platformRouter from "./platform";
 import stripeConnectRouter from "./stripe-connect";
 import checkoutRouter from "./checkout";
 import messagesRouter from "./messages";
+import storiesRouter from "./stories";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(platformRouter);
 router.use(stripeConnectRouter);
 router.use(checkoutRouter);
 router.use(messagesRouter);
+router.use(storiesRouter);
 
 export default router;

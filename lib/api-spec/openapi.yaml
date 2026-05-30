@@ -1464,6 +1464,82 @@ paths:
               schema:
                 $ref: "#/components/schemas/Message"
 
+  # ── STORIES ──
+  /stories:
+    get:
+      operationId: listStories
+      tags: [stories]
+      summary: List active stories grouped by user (newest, unseen first)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StoryGroup"
+    post:
+      operationId: createStory
+      tags: [stories]
+      summary: Post a new story (expires in 24h)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StoryInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Story"
+
+  /stories/user/{userId}:
+    get:
+      operationId: listUserStories
+      tags: [stories]
+      summary: List one user's active stories (for the viewer)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Story"
+
+  /stories/{id}/view:
+    post:
+      operationId: markStoryViewed
+      tags: [stories]
+      summary: Mark a story as seen by the signed-in user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success]
+                properties:
+                  success: { type: boolean }
+
   # ── MODERATION ──
   /moderation/reports:
     get:
@@ -2120,6 +2196,39 @@ components:
       properties:
         recipientId: { type: integer }
         text: { type: string }
+
+    # ── STORIES ──
+    Story:
+      type: object
+      required: [id, userId, type, mediaUrl, createdAt, expiresAt]
+      properties:
+        id: { type: integer }
+        userId: { type: integer }
+        type: { type: string, enum: [video, image] }
+        mediaUrl: { type: string }
+        thumbnailUrl: { type: ["string", "null"] }
+        viewed: { type: boolean }
+        createdAt: { type: string }
+        expiresAt: { type: string }
+
+    StoryGroup:
+      type: object
+      required: [user, stories, hasUnseen]
+      properties:
+        user: { $ref: "#/components/schemas/User" }
+        stories:
+          type: array
+          items:
+            $ref: "#/components/schemas/Story"
+        hasUnseen: { type: boolean }
+
+    StoryInput:
+      type: object
+      required: [type, mediaUrl]
+      properties:
+        type: { type: string, enum: [video, image] }
+        mediaUrl: { type: string }
+        thumbnailUrl: { type: string }
 
     # ── MODERATION ──
     ModerationReport:

@@ -8,6 +8,7 @@ import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { StoriesBar } from "@/components/stories/stories-bar";
 
 export default function Home() {
   const { userId, isAuthenticated, login } = useCurrentUser();
@@ -153,6 +154,7 @@ export default function Home() {
   return (
     <div className="relative h-full w-full bg-black overflow-y-scroll snap-y snap-mandatory scrollbar-hide">
       <div className="absolute top-0 left-0 w-full z-10 bg-gradient-to-b from-black/80 to-transparent p-4 flex flex-col gap-4">
+        <StoriesBar />
         {streams && streams.length > 0 && (
           <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
             {streams.map((stream) => (
@@ -197,6 +199,7 @@ export default function Home() {
         const liked = likedMap[post.id] ?? false;
         const likeCount = (post.likeCount ?? 0) + (likeDeltas[post.id] ?? 0);
         const shareCount = (post.shareCount ?? 0) + (shareDeltas[post.id] ?? 0);
+        const authorStream = streams?.find((s) => s.user?.id === post.userId);
         return (
           <div
             key={post.id}
@@ -242,12 +245,22 @@ export default function Home() {
             </div>
 
             <div className="absolute right-4 bottom-24 flex flex-col items-center gap-6">
-              <Link href={`/profile/${post.userId}`}>
+              <Link href={authorStream ? `/live/${authorStream.id}` : `/profile/${post.userId}`}>
                 <div className="cursor-pointer relative">
-                  <img src={post.user?.avatarUrl || "/assets/avatar2.png"} alt="" className="w-12 h-12 rounded-full border-2 border-white object-cover" />
-                  <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-5 h-5 bg-primary rounded-full flex items-center justify-center text-black font-bold">
-                    +
-                  </div>
+                  <img
+                    src={post.user?.avatarUrl || "/assets/avatar2.png"}
+                    alt=""
+                    className={`w-12 h-12 rounded-full object-cover border-2 ${authorStream ? "border-secondary" : "border-white"}`}
+                  />
+                  {authorStream ? (
+                    <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-secondary text-white text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wider">
+                      LIVE
+                    </div>
+                  ) : (
+                    <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-5 h-5 bg-primary rounded-full flex items-center justify-center text-black font-bold">
+                      +
+                    </div>
+                  )}
                 </div>
               </Link>
 

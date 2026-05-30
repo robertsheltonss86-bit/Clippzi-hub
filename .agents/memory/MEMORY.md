@@ -1,0 +1,2 @@
+- [DB schema changes](db-schema-workflow.md) — drizzle-kit push needs a TTY and hangs here; create/alter tables with executeSql instead.
+- [OpenAPI codegen](openapi-codegen.md) — orval fails on any `$ref` to a missing schema; there is no shared SuccessResponse — inline simple OK responses.

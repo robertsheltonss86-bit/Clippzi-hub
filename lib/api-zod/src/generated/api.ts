@@ -1984,6 +1984,83 @@ export const SendMessageBody = zod.object({
 
 
 /**
+ * @summary List active stories grouped by user (newest, unseen first)
+ */
+export const ListStoriesResponseItem = zod.object({
+  "user": zod.object({
+  "id": zod.number(),
+  "username": zod.string(),
+  "displayName": zod.string(),
+  "bio": zod.string().nullish(),
+  "avatarUrl": zod.string().nullish(),
+  "bannerUrl": zod.string().nullish(),
+  "isVerified": zod.boolean().optional(),
+  "isLive": zod.boolean().optional(),
+  "followerCount": zod.number().optional(),
+  "followingCount": zod.number().optional(),
+  "postCount": zod.number().optional(),
+  "totalViews": zod.number().optional(),
+  "role": zod.enum(['user', 'streamer', 'admin']).optional(),
+  "createdAt": zod.string()
+}),
+  "stories": zod.array(zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "type": zod.enum(['video', 'image']),
+  "mediaUrl": zod.string(),
+  "thumbnailUrl": zod.string().nullish(),
+  "viewed": zod.boolean().optional(),
+  "createdAt": zod.string(),
+  "expiresAt": zod.string()
+})),
+  "hasUnseen": zod.boolean()
+})
+export const ListStoriesResponse = zod.array(ListStoriesResponseItem)
+
+
+/**
+ * @summary Post a new story (expires in 24h)
+ */
+export const CreateStoryBody = zod.object({
+  "type": zod.enum(['video', 'image']),
+  "mediaUrl": zod.string(),
+  "thumbnailUrl": zod.string().optional()
+})
+
+
+/**
+ * @summary List one user's active stories (for the viewer)
+ */
+export const ListUserStoriesParams = zod.object({
+  "userId": zod.coerce.number()
+})
+
+export const ListUserStoriesResponseItem = zod.object({
+  "id": zod.number(),
+  "userId": zod.number(),
+  "type": zod.enum(['video', 'image']),
+  "mediaUrl": zod.string(),
+  "thumbnailUrl": zod.string().nullish(),
+  "viewed": zod.boolean().optional(),
+  "createdAt": zod.string(),
+  "expiresAt": zod.string()
+})
+export const ListUserStoriesResponse = zod.array(ListUserStoriesResponseItem)
+
+
+/**
+ * @summary Mark a story as seen by the signed-in user
+ */
+export const MarkStoryViewedParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const MarkStoryViewedResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
  * @summary List content moderation reports
  */
 export const ListModerationReportsQueryParams = zod.object({

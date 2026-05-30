@@ -614,6 +614,46 @@ export interface MessageInput {
   text: string;
 }
 
+export type StoryType = typeof StoryType[keyof typeof StoryType];
+
+
+export const StoryType = {
+  video: 'video',
+  image: 'image',
+} as const;
+
+export interface Story {
+  id: number;
+  userId: number;
+  type: StoryType;
+  mediaUrl: string;
+  /** @nullable */
+  thumbnailUrl?: string | null;
+  viewed?: boolean;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface StoryGroup {
+  user: User;
+  stories: Story[];
+  hasUnseen: boolean;
+}
+
+export type StoryInputType = typeof StoryInputType[keyof typeof StoryInputType];
+
+
+export const StoryInputType = {
+  video: 'video',
+  image: 'image',
+} as const;
+
+export interface StoryInput {
+  type: StoryInputType;
+  mediaUrl: string;
+  thumbnailUrl?: string;
+}
+
 export type ModerationReportContentType = typeof ModerationReportContentType[keyof typeof ModerationReportContentType];
 
 
@@ -924,6 +964,10 @@ unreadOnly?: boolean;
 export type ListMessagesParams = {
 otherUserId: number;
 limit?: number;
+};
+
+export type MarkStoryViewed200 = {
+  success: boolean;
 };
 
 export type ListModerationReportsParams = {
