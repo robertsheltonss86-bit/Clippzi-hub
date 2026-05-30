@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { Users, Copy, Check, X, UserPlus, KeyRound, Loader2 } from "lucide-react";
+import { Users, Check, X, UserPlus, Loader2 } from "lucide-react";
 
 type CohostUser = { id: number; displayName?: string | null; username?: string | null; avatarUrl?: string | null };
 type CohostRow = { id: number; userId: number; status: "pending" | "approved" | "rejected"; createdAt: string; user: CohostUser | null };
@@ -46,10 +45,11 @@ export function CohostPanel({ streamId, isHost, onChanged }: { streamId: number;
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<CohostsResp | null>(null);
   const [loading, setLoading] = useState(false);
-  const [code, setCode] = useState("");
-  const [copied, setCopied] = useState(false);
   const [enabling, setEnabling] = useState(false);
   const [myStatus, setMyStatus] = useState<"none" | "pending" | "approved" | "rejected">("none");
+  // Mirrors myStatus in a ref so the polling interval (a stale closure) can
+  // reliably detect the pending->approved transition and auto-join.
+  const prevStatusRef = useRef<"none" | "pending" | "approved" | "rejected">("none");
   const isGroup = data?.mode === "group";
 
   const enableGroup = async () => {
@@ -73,11 +73,13 @@ export function CohostPanel({ streamId, isHost, onChanged }: { streamId: number;
       if (userId) {
         const mine = [...d.approved, ...d.pending].find((r) => r.userId === userId);
         const next = mine ? mine.status : "none";
-        // Auto-reload when a pending viewer just got approved so we re-mint a publisher token
-        if (!isHost && myStatus === "pending" && next === "approved") {
+        // Auto-reload when a pending viewer just got approved so we re-mint a publisher token.
+        // Compare against the ref (not stale closure state) so the poll never misses it.
+        if (!isHost && prevStatusRef.current === "pending" && next === "approved") {
           toast({ title: "You're in! 🎉", description: "Joining the grid…" });
           setTimeout(() => window.location.reload(), 700);
         }
+        prevStatusRef.current = next;
         setMyStatus(next);
       }
       onChanged?.();
@@ -92,13 +94,6 @@ export function CohostPanel({ streamId, isHost, onChanged }: { streamId: number;
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, streamId]);
-
-  const copy = async () => {
-    if (!data?.inviteCode) return;
-    await navigator.clipboard.writeText(data.inviteCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
 
   const approve = async (uid: number) => {
     try { await apiPost(`/livestreams/${streamId}/cohosts/${uid}/approve`); refresh(); }
@@ -128,21 +123,6 @@ export function CohostPanel({ streamId, isHost, onChanged }: { streamId: number;
       toast({ title: "Couldn't request", description: e.message, variant: "destructive" });
     }
   };
-  const joinByCode = async () => {
-    if (!isAuthenticated) { login(); return; }
-    if (!code.trim()) return;
-    try {
-      await apiPost(`/livestreams/${streamId}/cohosts/join-by-code`, { code: code.trim().toUpperCase() });
-      setMyStatus("approved");
-      toast({ title: "Joined the group 🎉", description: "Reload to publish your camera." });
-      refresh();
-      // soft refresh to re-mint publisher token
-      setTimeout(() => window.location.reload(), 800);
-    } catch (e: any) {
-      toast({ title: "Invalid code", description: e.message, variant: "destructive" });
-    }
-  };
-
   const approved = data?.approved ?? [];
   const pending = data?.pending ?? [];
 
@@ -181,17 +161,8 @@ export function CohostPanel({ streamId, isHost, onChanged }: { streamId: number;
           )}
 
           {isHost && isGroup && (
-            <div className="rounded-lg border border-accent/30 bg-accent/10 p-3">
-              <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Invite code</div>
-              <div className="flex items-center gap-2">
-                <div className="font-mono text-2xl font-extrabold text-accent tracking-widest flex-1" data-testid="text-invite-code">
-                  {data?.inviteCode || "––––––"}
-                </div>
-                <Button onClick={copy} size="icon" variant="secondary" className="h-9 w-9" data-testid="button-copy-code">
-                  {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">Anyone with this code joins the grid instantly.</p>
+            <div className="rounded-lg border border-primary/30 bg-primary/10 p-3 text-sm text-white">
+              When someone taps <span className="font-semibold text-primary">Join</span>, they show up under <span className="font-semibold">Pending requests</span> below — just tap <span className="text-green-400 font-semibold">✓ accept</span> and their camera pops onto the grid automatically.
             </div>
           )}
 
@@ -203,28 +174,12 @@ export function CohostPanel({ streamId, isHost, onChanged }: { streamId: number;
                 </div>
               ) : myStatus === "pending" ? (
                 <div className="rounded-lg border border-accent/40 bg-accent/10 p-3 text-sm text-accent">
-                  ⏳ Waiting for host to approve your request…
+                  ⏳ Waiting for the host to accept you…
                 </div>
               ) : (
-                <>
-                  <Button onClick={request} className="w-full bg-primary hover:bg-primary/80 text-black font-bold" data-testid="button-request-join">
-                    <UserPlus className="w-4 h-4 mr-2" /> Request to join
-                  </Button>
-                  <div className="text-xs text-center text-muted-foreground">— or —</div>
-                  <div className="flex gap-2">
-                    <Input
-                      value={code}
-                      onChange={(e) => setCode(e.target.value.toUpperCase())}
-                      placeholder="ENTER CODE"
-                      maxLength={6}
-                      className="font-mono uppercase tracking-widest text-center"
-                      data-testid="input-invite-code"
-                    />
-                    <Button onClick={joinByCode} className="bg-accent text-black font-bold" data-testid="button-join-by-code">
-                      <KeyRound className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </>
+                <Button onClick={request} className="w-full bg-primary hover:bg-primary/80 text-black font-bold" data-testid="button-request-join">
+                  <UserPlus className="w-4 h-4 mr-2" /> Ask to join the live
+                </Button>
               )}
             </div>
           )}
