@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Compass, Radio, PlusSquare, ShoppingBag, Bell, User, ShieldAlert, LogIn, LogOut, MessageCircle, Coins, Plus, LifeBuoy } from "lucide-react";
+import { Home, Compass, Radio, PlusSquare, ShoppingBag, Bell, User, ShieldAlert, LogIn, LogOut, MessageCircle, Coins, Plus, LifeBuoy, Settings } from "lucide-react";
 import { AnimatedLogo } from "./animated-logo";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useGetUser } from "@workspace/api-client-react";
 import { CoinStore } from "@/components/coins/coin-store";
 import { useCoinBalance } from "@/hooks/use-coin-balance";
+import { SettingsMenu } from "@/components/settings/settings-menu";
+import { WhosLiveButton } from "@/components/live/whos-live-button";
 
 // A circular "my account" avatar that links straight to the signed-in user's
 // own profile, where they can edit their photo, banner, and bio. It prefers the
@@ -116,6 +118,15 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
+          <SettingsMenu>
+            <button
+              className="flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-200 cursor-pointer w-full text-left"
+              data-testid="button-settings"
+            >
+              <Settings className="w-6 h-6" />
+              <span className="text-lg">Settings</span>
+            </button>
+          </SettingsMenu>
         </nav>
 
         <button
@@ -177,6 +188,11 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
               </button>
               <Link href="/messages"><MessageCircle className="w-6 h-6 text-foreground cursor-pointer" /></Link>
               <Link href="/notifications"><Bell className="w-6 h-6 text-foreground cursor-pointer" /></Link>
+              <SettingsMenu>
+                <button data-testid="button-settings-mobile" aria-label="Settings" className="active:scale-95 transition">
+                  <Settings className="w-6 h-6 text-foreground cursor-pointer" />
+                </button>
+              </SettingsMenu>
               {!isLoading && (
                 isAuthenticated && userId ? (
                   <Link href={profileHref} data-testid="link-profile-bubble-mobile">
@@ -190,6 +206,10 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
               )}
             </div>
           </header>
+        )}
+
+        {!isImmersive && (
+          <WhosLiveButton className="absolute right-4 z-40 top-[calc(124px+env(safe-area-inset-top))] md:top-[120px]" />
         )}
 
         <div className={`flex-1 overflow-y-auto h-full w-full scroll-smooth ${isImmersive ? "" : "pb-[60px] md:pb-0 pt-[calc(70px+env(safe-area-inset-top))] md:pt-0"}`}>
