@@ -33,12 +33,17 @@ async function fetchToken(streamId: number, role: "publisher" | "viewer"): Promi
 export function LiveKitBroadcaster({ streamId, filterCss }: { streamId: number; filterCss?: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const roomRef = useRef<Room | null>(null);
+  const startingRef = useRef(false); // serialize auto-attempt + tap/retry so we never double-connect
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string>("");
   const [camOn, setCamOn] = useState(true);
   const [micOn, setMicOn] = useState(true);
+  // iOS Safari blocks getUserMedia unless it runs inside a tap. We auto-try once,
+  // but if that doesn't reach "live" we show a big "Tap to go live" button so the
+  // host gets a real user gesture (the fix for "going live did nothing" on iPhone).
+  const [showTapPrompt, setShowTapPrompt] = useState(false);
 
-  const start = async () => {
+  const start = async (fromTap = false) => {
     setError("");
     if (!window.isSecureContext) {
       setStatus("insecure");
@@ -50,6 +55,11 @@ export function LiveKitBroadcaster({ streamId, filterCss }: { streamId: number; 
       setError("Your browser doesn't support camera access.");
       return;
     }
+    if (startingRef.current) return; // serialize auto-attempt + tap/retry
+    startingRef.current = true;
+    // Drop any half-open room from a previous attempt so we never double-publish.
+    await roomRef.current?.disconnect().catch(() => {});
+    roomRef.current = null;
     setStatus("connecting");
     try {
       const { token, url } = await fetchToken(streamId, "publisher");
@@ -66,12 +76,21 @@ export function LiveKitBroadcaster({ streamId, filterCss }: { streamId: number; 
           t.attach(videoRef.current);
         }
       }
+      setShowTapPrompt(false);
       setStatus("live");
     } catch (e: any) {
       const name = e?.name ?? "";
       if (name === "NotAllowedError") {
-        setStatus("denied");
-        setError("Camera access denied. Allow camera + microphone in your browser settings.");
+        // Auto-attempt (no gesture) failing on iOS is expected — show the inviting
+        // tap button rather than a scary "blocked" screen. Only a *tapped* attempt
+        // that still fails means the user truly denied permission.
+        if (fromTap) {
+          setStatus("denied");
+          setError("Allow camera + microphone for this site in your browser settings, then tap Try again.");
+        } else {
+          setStatus("idle");
+          setShowTapPrompt(true);
+        }
       } else if (name === "NotFoundError") {
         setStatus("no-device");
         setError("No camera found on this device.");
@@ -79,6 +98,8 @@ export function LiveKitBroadcaster({ streamId, filterCss }: { streamId: number; 
         setStatus("error");
         setError(e?.message ?? "Could not start broadcast.");
       }
+    } finally {
+      startingRef.current = false;
     }
   };
 
@@ -94,7 +115,7 @@ export function LiveKitBroadcaster({ streamId, filterCss }: { streamId: number; 
     (async () => {
       await roomRef.current?.disconnect();
       if (cancelled) return;
-      await start();
+      await start(false);
     })();
     return () => {
       cancelled = true;
@@ -103,6 +124,14 @@ export function LiveKitBroadcaster({ streamId, filterCss }: { streamId: number; 
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streamId]);
+
+  // If we don't reach "live" shortly after connecting (e.g. iOS waiting on a
+  // gesture), surface the big tap-to-go-live button.
+  useEffect(() => {
+    if (status !== "connecting") return undefined;
+    const t = setTimeout(() => setShowTapPrompt(true), 3000);
+    return () => clearTimeout(t);
+  }, [status]);
 
   const toggleCam = () => {
     const p = roomRef.current?.localParticipant as LocalParticipant | undefined;
@@ -137,21 +166,33 @@ export function LiveKitBroadcaster({ streamId, filterCss }: { streamId: number; 
       {status !== "live" && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/85 p-6 z-30">
           <div className="max-w-sm w-full text-center space-y-3">
-            {status === "connecting" && (
+            {status === "connecting" && !showTapPrompt && (
               <>
                 <Loader2 className="w-10 h-10 mx-auto text-primary animate-spin" />
                 <p className="text-white font-semibold">Going live…</p>
                 <p className="text-xs text-muted-foreground">Allow camera + mic when your browser asks.</p>
               </>
             )}
-            {status !== "connecting" && (
+            {/* Inviting tap-to-go-live (iOS needs a gesture; also a friendly fallback) */}
+            {(showTapPrompt || status === "idle") && status !== "denied" && status !== "no-device" && status !== "insecure" && status !== "error" && (
+              <button
+                onClick={() => start(true)}
+                className="mx-auto flex flex-col items-center gap-3 rounded-3xl bg-primary px-10 py-8 text-black font-extrabold text-xl shadow-2xl active:scale-95 transition"
+                data-testid="button-go-live-camera"
+              >
+                <Camera className="w-12 h-12" />
+                Tap to go live
+                <span className="text-sm font-semibold text-black/70">Turn on your camera &amp; mic</span>
+              </button>
+            )}
+            {(status === "denied" || status === "no-device" || status === "insecure" || status === "error") && (
               <>
                 <AlertCircle className="w-10 h-10 mx-auto text-secondary" />
                 <p className="text-white font-semibold">
                   {status === "denied" ? "Camera blocked" : status === "no-device" ? "No camera" : status === "insecure" ? "Insecure connection" : "Couldn't start"}
                 </p>
                 {error && <p className="text-xs text-muted-foreground">{error}</p>}
-                <Button onClick={start} className="w-full" data-testid="button-retry-broadcast">
+                <Button onClick={() => start(true)} className="w-full" data-testid="button-retry-broadcast">
                   <Camera className="w-4 h-4 mr-2" /> Try again
                 </Button>
               </>

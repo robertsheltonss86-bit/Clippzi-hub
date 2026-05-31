@@ -88,12 +88,14 @@ export function CohostPanel({ streamId, isHost, onChanged }: { streamId: number;
   };
 
   useEffect(() => {
-    if (!open) return;
+    // Host polls in the background too (even when the panel is closed) so the
+    // pending-request badge lights up and they notice someone asking to join.
+    if (!open && !isHost) return;
     refresh();
-    const id = setInterval(refresh, 4000); // poll for new requests
+    const id = setInterval(refresh, open ? 4000 : 7000); // poll for new requests
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, streamId]);
+  }, [open, streamId, isHost]);
 
   const approve = async (uid: number) => {
     try { await apiPost(`/livestreams/${streamId}/cohosts/${uid}/approve`); refresh(); }
@@ -206,11 +208,11 @@ export function CohostPanel({ streamId, isHost, onChanged }: { streamId: number;
                       <div className="flex-1 min-w-0">
                         <div className="text-sm text-white truncate">{r.user?.displayName || r.user?.username}</div>
                       </div>
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-green-500 hover:bg-green-500/10" onClick={() => approve(r.userId)} data-testid={`button-approve-${r.userId}`}>
-                        <Check className="w-4 h-4" />
+                      <Button size="sm" className="h-10 px-4 bg-green-500 hover:bg-green-600 text-black font-bold" onClick={() => approve(r.userId)} data-testid={`button-approve-${r.userId}`}>
+                        <Check className="w-4 h-4 mr-1" /> Accept
                       </Button>
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-secondary hover:bg-secondary/10" onClick={() => reject(r.userId)} data-testid={`button-reject-${r.userId}`}>
-                        <X className="w-4 h-4" />
+                      <Button size="icon" variant="ghost" className="h-10 w-10 text-secondary hover:bg-secondary/10" onClick={() => reject(r.userId)} data-testid={`button-reject-${r.userId}`}>
+                        <X className="w-5 h-5" />
                       </Button>
                     </div>
                   ))}

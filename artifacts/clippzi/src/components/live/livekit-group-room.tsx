@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Room,
   RoomEvent,
@@ -35,8 +35,12 @@ type RoomCtx = {
   isHost: boolean;
   isCohost: boolean;
   participants: Participant[]; // host + cohosts (publishers)
+  published: boolean;        // our camera/mic are live in the room
+  cameraError: string;       // last camera/mic acquisition error (if any)
+  showCameraPrompt: boolean; // show the "tap to go on camera" button
+  startCamera: () => void;   // user-gesture entry point (required on iOS)
 };
-const RoomContext = createContext<RoomCtx>({ room: null, canPublish: false, isHost: false, isCohost: false, participants: [] });
+const RoomContext = createContext<RoomCtx>({ room: null, canPublish: false, isHost: false, isCohost: false, participants: [], published: false, cameraError: "", showCameraPrompt: false, startCamera: () => {} });
 export const useGroupRoom = () => useContext(RoomContext);
 
 // Helper to identify publisher (host or cohost) tiles
@@ -56,11 +60,21 @@ export function GroupRoomProvider({ streamId, children }: { streamId: number; ch
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [error, setError] = useState("");
   const [status, setStatus] = useState<"idle" | "connecting" | "connected" | "error">("idle");
+  const [published, setPublished] = useState(false);
+  const [cameraError, setCameraError] = useState("");
+  const [showCameraPrompt, setShowCameraPrompt] = useState(false);
+  const roomRef = useRef<Room | null>(null);
+  const startingRef = useRef(false); // in-flight guard so auto-attempt + tap can't double-publish
 
   useEffect(() => {
     let cancelled = false;
     const r = new Room({ adaptiveStream: true, dynacast: true });
     setStatus("connecting");
+    // Fresh connect cycle: clear any stale publish state so we always re-evaluate.
+    setPublished(false);
+    setCameraError("");
+    setShowCameraPrompt(false);
+    startingRef.current = false;
 
     const refresh = () => {
       if (cancelled) return;
@@ -93,17 +107,12 @@ export function GroupRoomProvider({ streamId, children }: { streamId: number; ch
         await r.connect(meta.url, token);
         if (cancelled) { r.disconnect(); return; }
 
-        if (meta.isHost || meta.isCohost) {
-          try {
-            const tracks = await createLocalTracks({
-              audio: true,
-              video: { facingMode: "user", resolution: { width: 640, height: 360, frameRate: 24 } },
-            });
-            for (const t of tracks) await r.localParticipant.publishTrack(t);
-          } catch (e: any) {
-            setError(e?.message || "Camera access blocked.");
-          }
-        }
+        // NOTE: camera/mic are NOT acquired here. iOS Safari blocks getUserMedia
+        // unless it runs inside a user gesture, so publishing is deferred to
+        // startCamera() (auto-attempted, with a visible "tap to go on camera"
+        // fallback button). This is what makes co-host/group publishing reliable
+        // on iPhone after the approval reload.
+        roomRef.current = r;
         setRoom(r);
         setStatus("connected");
         refresh();
@@ -144,11 +153,51 @@ export function GroupRoomProvider({ streamId, children }: { streamId: number; ch
       if (pollId) clearInterval(pollId);
       r.removeAllListeners();
       r.disconnect();
+      roomRef.current = null;
+      startingRef.current = false;
     };
   }, [streamId]);
 
+  // Acquire camera + mic and publish. MUST be reachable from a user gesture on
+  // iOS (the "tap to go on camera" button) — Safari rejects getUserMedia that
+  // isn't tied to a tap, which is why auto-publish silently failed before.
+  const startCamera = useCallback(async () => {
+    const r = roomRef.current;
+    if (!r || !canPublishRef.current || published) return;
+    if (startingRef.current) return; // serialize auto-attempt + tap
+    // Already publishing a camera? Treat as live (source of truth = LiveKit state).
+    const existingCam = r.localParticipant.getTrackPublication(Track.Source.Camera);
+    if (existingCam?.track) { setPublished(true); setShowCameraPrompt(false); return; }
+    startingRef.current = true;
+    try {
+      const tracks = await createLocalTracks({
+        audio: true,
+        video: { facingMode: "user", resolution: { width: 640, height: 360, frameRate: 24 } },
+      });
+      for (const t of tracks) await r.localParticipant.publishTrack(t);
+      setPublished(true);
+      setCameraError("");
+      setShowCameraPrompt(false);
+    } catch (e: any) {
+      // Most common on iPhone: needs an explicit tap to allow camera/mic.
+      setCameraError(e?.message || "Tap to allow your camera & microphone.");
+      setShowCameraPrompt(true);
+    } finally {
+      startingRef.current = false;
+    }
+  }, [published]);
+
+  // Auto-attempt publishing once connected (works on desktop / when a recent
+  // gesture exists). If it doesn't succeed quickly, surface the tap button.
+  useEffect(() => {
+    if (!room || !canPublish || published) return undefined;
+    startCamera();
+    const t = setTimeout(() => { if (!published) setShowCameraPrompt(true); }, 2500);
+    return () => clearTimeout(t);
+  }, [room, canPublish, published, startCamera]);
+
   return (
-    <RoomContext.Provider value={{ room, canPublish, isHost, isCohost, participants }}>
+    <RoomContext.Provider value={{ room, canPublish, isHost, isCohost, participants, published, cameraError, showCameraPrompt, startCamera }}>
       {status === "error" && (
         <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 bg-red-600/90 text-white text-xs px-3 py-1 rounded-full">
           {error}
@@ -235,7 +284,7 @@ function ParticipantTile({ participant, isLocal, filterCss }: { participant: Par
 
 /** Grid stage: shows up to 15 publisher tiles + on-screen controls if local user is publishing */
 export function LiveKitGroupStage({ filterCss }: { filterCss?: string } = {}) {
-  const { room, canPublish, participants } = useGroupRoom();
+  const { room, canPublish, participants, published, cameraError, showCameraPrompt, startCamera } = useGroupRoom();
   const [camOn, setCamOn] = useState(true);
   const [micOn, setMicOn] = useState(true);
 
@@ -292,7 +341,22 @@ export function LiveKitGroupStage({ filterCss }: { filterCss?: string } = {}) {
           })}
         </div>
       )}
-      {canPublish && (
+      {canPublish && !published && showCameraPrompt && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/75 backdrop-blur-sm p-6">
+          <button
+            onClick={startCamera}
+            className="flex flex-col items-center gap-3 rounded-3xl bg-primary px-10 py-8 text-black font-extrabold text-xl shadow-2xl active:scale-95 transition"
+            data-testid="button-go-on-camera"
+          >
+            <Camera className="w-12 h-12" />
+            Tap to go on camera
+            <span className="text-sm font-semibold text-black/70 max-w-[240px] text-center">
+              {cameraError || "Allow your camera & mic to join the live"}
+            </span>
+          </button>
+        </div>
+      )}
+      {canPublish && published && (
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-30">
           <Button onClick={toggleCam} size="icon" variant="secondary" className="rounded-full bg-black/70 backdrop-blur border border-white/20 h-10 w-10" data-testid="button-group-cam">
             {camOn ? <Camera className="w-4 h-4 text-white" /> : <CameraOff className="w-4 h-4 text-secondary" />}

@@ -454,7 +454,7 @@ export default function LiveStream() {
           ))}
         </div>
 
-        <div className="absolute inset-0 z-20 bg-gradient-to-b from-black/80 via-transparent to-black/80 pointer-events-none flex flex-col justify-between px-3 sm:px-4 pb-3 sm:pb-4" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
+        <div className="absolute inset-0 z-20 bg-gradient-to-b from-black/80 via-transparent to-black/80 pointer-events-none flex flex-col justify-between px-3 sm:px-4 pb-3 sm:pb-4" style={{ paddingTop: "max(1.5rem, calc(env(safe-area-inset-top) + 0.75rem))" }}>
           <div className="flex justify-between items-start gap-2 pointer-events-auto">
             {/* LEFT: back + streamer info (viewer) OR compact LIVE badge (host) */}
             <div className="flex items-start gap-1.5 min-w-0 flex-1">
@@ -462,11 +462,11 @@ export default function LiveStream() {
                 onClick={() => setLocation("/live")}
                 size="icon"
                 variant="ghost"
-                className="rounded-full bg-black/60 backdrop-blur border border-white/10 h-8 w-8 text-white hover:bg-black/80 shrink-0"
+                className="rounded-full bg-black/60 backdrop-blur border border-white/10 h-11 w-11 text-white hover:bg-black/80 shrink-0"
                 data-testid="button-back-live"
                 title="Back to Live"
               >
-                <ArrowLeft className="w-4 h-4" />
+                <ArrowLeft className="w-5 h-5" />
               </Button>
               {isOwnStream ? (
                 <div className="flex items-center gap-1 bg-black/55 backdrop-blur px-2 py-1 rounded-full border border-white/10">
@@ -496,11 +496,11 @@ export default function LiveStream() {
                 <Button
                   onClick={handleEndLive}
                   disabled={endingStream}
-                  size="sm"
-                  className="rounded-full bg-red-600 hover:bg-red-700 text-white h-8 px-3 text-xs gap-1 font-bold disabled:opacity-50"
+                  size="lg"
+                  className="rounded-full bg-red-600 hover:bg-red-700 text-white h-12 px-5 text-base gap-1.5 font-extrabold shadow-lg shadow-red-900/40 disabled:opacity-50"
                   data-testid="button-end-live"
                 >
-                  <X className="w-3.5 h-3.5" /> {endingStream ? "Ending…" : "End"}
+                  <X className="w-5 h-5" /> {endingStream ? "Ending…" : "End Live"}
                 </Button>
               )}
             </div>
