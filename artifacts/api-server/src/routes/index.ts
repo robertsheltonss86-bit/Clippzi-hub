@@ -14,6 +14,7 @@ import checkoutRouter from "./checkout";
 import coinsRouter from "./coins";
 import messagesRouter from "./messages";
 import storiesRouter from "./stories";
+import supportRouter from "./support";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use(checkoutRouter);
 router.use(coinsRouter);
 router.use(messagesRouter);
 router.use(storiesRouter);
+router.use(supportRouter);
 
 export default router;

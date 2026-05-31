@@ -22,6 +22,8 @@ export const usersTable = pgTable("users", {
   role: userRoleEnum("role").notNull().default("user"),
   stripeAccountId: text("stripe_account_id"),
   stripePayoutsEnabled: boolean("stripe_payouts_enabled").notNull().default(false),
+  payoutMethod: text("payout_method"),
+  payoutHandle: text("payout_handle"),
   authUserId: text("auth_user_id").unique(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

@@ -18,8 +18,11 @@ import {
   LinkBankAccountParams,
   LinkBankAccountBody,
 } from "@workspace/api-zod";
+import { requireAuth, requireSelf } from "../middlewares/authMiddleware";
 
 const router = Router();
+
+const PAYOUT_METHODS = ["paypal", "cashapp", "venmo", "zelle", "other"] as const;
 
 function formatUser(u: typeof usersTable.$inferSelect) {
   return {
@@ -74,11 +77,13 @@ router.get("/users/:id", async (req, res) => {
 });
 
 // PATCH /users/:id
-router.patch("/users/:id", async (req, res) => {
+router.patch("/users/:id", requireSelf("id"), async (req, res) => {
   try {
     const { id } = UpdateUserParams.parse({ id: Number(req.params.id) });
     const body = UpdateUserBody.parse(req.body);
     const { role, username, ...rest } = body;
+    // Only an admin may change a user's role; a self-edit can never escalate.
+    const roleUpdate = role && req.user?.isAdmin ? { role: role as "user" | "streamer" | "admin" } : {};
 
     let normalizedUsername: string | undefined;
     if (username !== undefined) {
@@ -100,7 +105,7 @@ router.patch("/users/:id", async (req, res) => {
       [user] = await db.update(usersTable).set({
         ...rest,
         ...(normalizedUsername ? { username: normalizedUsername } : {}),
-        ...(role ? { role: role as "user" | "streamer" | "admin" } : {}),
+        ...roleUpdate,
       }).where(eq(usersTable.id, id)).returning();
     } catch (e: any) {
       // Postgres unique-violation (e.g. a concurrent request grabbed the same
@@ -378,6 +383,58 @@ router.get("/users/:id/payout", async (req, res) => {
     const id = Number(req.params.id);
     const rows = await db.select().from(payoutsTable).where(eq(payoutsTable.userId, id)).orderBy(desc(payoutsTable.createdAt));
     res.json(rows.map((r) => ({ ...r, amount: Number(r.amount), createdAt: r.createdAt.toISOString() })));
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+// GET /users/:id/payout-method — the saved one-time payout details.
+// Readable by the account owner or an admin (so the owner can pay creators).
+router.get("/users/:id/payout-method", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: "Invalid user id" });
+    if (req.user!.appUserId !== id && !req.user!.isAdmin) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const [u] = await db
+      .select({
+        payoutMethod: usersTable.payoutMethod,
+        payoutHandle: usersTable.payoutHandle,
+        stripePayoutsEnabled: usersTable.stripePayoutsEnabled,
+      })
+      .from(usersTable)
+      .where(eq(usersTable.id, id));
+    if (!u) return res.status(404).json({ error: "User not found" });
+    res.json({
+      payoutMethod: u.payoutMethod ?? null,
+      payoutHandle: u.payoutHandle ?? null,
+      hasPayout: !!(u.payoutMethod && u.payoutHandle) || u.stripePayoutsEnabled,
+    });
+  } catch (e) {
+    res.status(400).json({ error: String(e) });
+  }
+});
+
+// PUT /users/:id/payout-method — the account owner saves how they want to be paid.
+router.put("/users/:id/payout-method", requireSelf("id"), async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const method = String(req.body?.method ?? "").trim().toLowerCase();
+    const handle = String(req.body?.handle ?? "").trim();
+    if (!(PAYOUT_METHODS as readonly string[]).includes(method)) {
+      return res.status(400).json({ error: "Choose a valid payout method." });
+    }
+    if (handle.length < 3 || handle.length > 120) {
+      return res.status(400).json({ error: "Enter your payout details (3–120 characters)." });
+    }
+    const [u] = await db
+      .update(usersTable)
+      .set({ payoutMethod: method, payoutHandle: handle })
+      .where(eq(usersTable.id, id))
+      .returning();
+    if (!u) return res.status(404).json({ error: "User not found" });
+    res.json({ payoutMethod: u.payoutMethod, payoutHandle: u.payoutHandle, hasPayout: true });
   } catch (e) {
     res.status(400).json({ error: String(e) });
   }

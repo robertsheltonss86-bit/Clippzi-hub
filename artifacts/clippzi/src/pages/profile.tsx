@@ -10,11 +10,16 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Camera, Edit2, CheckCircle, Heart, Play, Users, Video, Eye, BadgeCheck, DollarSign, Trash2, LogOut, MessageCircle, Coins, Plus } from "lucide-react";
+import { Camera, Edit2, CheckCircle, Heart, Play, Users, Video, Eye, BadgeCheck, DollarSign, Trash2, LogOut, MessageCircle, Coins, Plus, Banknote, LifeBuoy } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useCoinBalance } from "@/hooks/use-coin-balance";
 import { CoinStore } from "@/components/coins/coin-store";
+import { usePayoutMethod } from "@/hooks/use-payout-method";
+import { PayoutSetup } from "@/components/payout/payout-setup";
 import { formatPoints } from "@/lib/points";
+
+const PAYOUT_LABELS: Record<string, string> = { paypal: "PayPal", cashapp: "Cash App", venmo: "Venmo", zelle: "Zelle", other: "Other" };
+function methodLabel(m: string) { return PAYOUT_LABELS[m] ?? m; }
 
 function StatBox({ label, value }: { label: string; value: string | number }) {
   return (
@@ -87,7 +92,7 @@ function UploadableImage({
 
 export default function Profile() {
   const params = useParams<{ id: string }>();
-  const { userId: meId, isAuthenticated, login, logout } = useCurrentUser();
+  const { userId: meId, isAuthenticated, isAdmin, login, logout } = useCurrentUser();
   const userId = Number(params.id) || meId || 0;
   const isOwnProfile = !!meId && userId === meId;
   const [, setLocation] = useLocation();
@@ -95,6 +100,8 @@ export default function Profile() {
 
   const { balance: coinBalance } = useCoinBalance();
   const [coinStoreOpen, setCoinStoreOpen] = useState(false);
+  const { data: payout, refetch: refetchPayout } = usePayoutMethod(userId, isOwnProfile || isAdmin);
+  const [payoutOpen, setPayoutOpen] = useState(false);
 
   const [editOpen, setEditOpen] = useState(false);
   const [editDisplayName, setEditDisplayName] = useState("");
@@ -297,6 +304,11 @@ export default function Profile() {
               </Button>
             )}
             {isOwnProfile && (
+              <Button onClick={() => setLocation("/support")} variant="outline" size="sm" className="gap-1.5 border-border" data-testid="button-report-problem">
+                <LifeBuoy className="w-3.5 h-3.5" /> Report a Problem
+              </Button>
+            )}
+            {isOwnProfile && (
               <Button onClick={logout} variant="outline" size="sm" className="gap-1.5 border-border" data-testid="button-logout-profile">
                 <LogOut className="w-3.5 h-3.5" /> Log out
               </Button>
@@ -344,6 +356,52 @@ export default function Profile() {
             >
               <Plus className="w-4 h-4" /> Get Coins
             </Button>
+          </div>
+        )}
+
+        {/* Payout method (own profile) — one-time setup, required before going live */}
+        {isOwnProfile && (
+          <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-border bg-card/50 p-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-11 h-11 rounded-full bg-emerald-500/15 border border-emerald-400/40 flex items-center justify-center shrink-0">
+                <Banknote className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">How you get paid</p>
+                {payout?.payoutMethod && payout?.payoutHandle ? (
+                  <p className="text-sm font-bold text-white truncate" data-testid="text-payout-method">
+                    {methodLabel(payout.payoutMethod)} · {payout.payoutHandle}
+                  </p>
+                ) : payout?.hasPayout ? (
+                  <p className="text-sm font-bold text-white">Stripe payouts enabled</p>
+                ) : (
+                  <p className="text-sm font-semibold text-amber-400">Not set up — required to go live</p>
+                )}
+              </div>
+            </div>
+            <Button
+              onClick={() => setPayoutOpen(true)}
+              variant="outline"
+              size="sm"
+              className="border-border shrink-0"
+              data-testid="button-edit-payout"
+            >
+              {payout?.payoutMethod ? "Edit" : "Set up"}
+            </Button>
+          </div>
+        )}
+
+        {/* Admin: how to pay this creator (read-only, when viewing someone else) */}
+        {!isOwnProfile && isAdmin && payout && (payout.payoutMethod || payout.hasPayout) && (
+          <div className="mb-6 rounded-xl border border-emerald-400/30 bg-emerald-500/5 p-4" data-testid="admin-payout-view">
+            <p className="text-xs text-emerald-400 font-semibold mb-1">Admin · how to pay this creator</p>
+            {payout.payoutMethod && payout.payoutHandle ? (
+              <p className="text-sm text-white">
+                {methodLabel(payout.payoutMethod)} — <span className="font-mono">{payout.payoutHandle}</span>
+              </p>
+            ) : (
+              <p className="text-sm text-white">Stripe payouts enabled</p>
+            )}
           </div>
         )}
 
@@ -503,6 +561,23 @@ export default function Profile() {
       </Dialog>
 
       <CoinStore open={coinStoreOpen} onOpenChange={setCoinStoreOpen} balance={coinBalance} />
+
+      {isOwnProfile && (
+        <Dialog open={payoutOpen} onOpenChange={setPayoutOpen}>
+          <DialogContent className="bg-card border-border max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-white">How do you want to get paid?</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground -mt-1">Pick where Clippzi should send your earnings. You only need to do this once.</p>
+            <PayoutSetup
+              userId={userId}
+              currentMethod={payout?.payoutMethod}
+              currentHandle={payout?.payoutHandle}
+              onSaved={() => { setPayoutOpen(false); refetchPayout(); }}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

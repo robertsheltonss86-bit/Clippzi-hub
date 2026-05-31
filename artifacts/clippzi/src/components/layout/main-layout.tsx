@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Compass, Radio, PlusSquare, ShoppingBag, Bell, User, ShieldAlert, LogIn, LogOut, MessageCircle, Coins, Plus } from "lucide-react";
+import { Home, Compass, Radio, PlusSquare, ShoppingBag, Bell, User, ShieldAlert, LogIn, LogOut, MessageCircle, Coins, Plus, LifeBuoy } from "lucide-react";
 import { AnimatedLogo } from "./animated-logo";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Button } from "@/components/ui/button";
@@ -87,6 +87,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
     ...baseItems,
     { href: "/messages", icon: MessageCircle, label: "Messages" },
     { href: profileHref, icon: User, label: "Profile" },
+    { href: "/support", icon: LifeBuoy, label: "Help" },
     ...(isAdmin ? [{ href: "/moderation", icon: ShieldAlert, label: "Mod" }] : []),
   ];
 

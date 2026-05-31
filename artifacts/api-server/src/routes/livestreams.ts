@@ -105,6 +105,22 @@ router.post("/livestreams", requireAuth, async (req, res) => {
     // Security: stream owner is always the authenticated user (ignore client-supplied userId)
     const ownerId = req.user!.appUserId;
     if (!ownerId) return res.status(401).json({ error: "Unauthorized" });
+    // One-time gate: a creator must set up how they get paid before going live.
+    const [owner] = await db
+      .select({
+        payoutMethod: usersTable.payoutMethod,
+        payoutHandle: usersTable.payoutHandle,
+        stripePayoutsEnabled: usersTable.stripePayoutsEnabled,
+      })
+      .from(usersTable)
+      .where(eq(usersTable.id, ownerId));
+    const hasPayout = !!(owner?.payoutMethod && owner?.payoutHandle) || !!owner?.stripePayoutsEnabled;
+    if (!hasPayout) {
+      return res.status(403).json({
+        error: "payout_required",
+        message: "Set up how you want to get paid before going live.",
+      });
+    }
     // Auto-end any of this user's prior live streams so they don't pile up as "ghost" lives.
     await db.update(livestreamsTable)
       .set({ status: "ended", endedAt: new Date() })

@@ -20,6 +20,7 @@ import Profile from "@/pages/profile";
 import Earnings from "@/pages/earnings";
 import Notifications from "@/pages/notifications";
 import Moderation from "@/pages/moderation";
+import Support from "@/pages/support";
 import CheckoutSuccess from "@/pages/checkout-success";
 import CheckoutCancel from "@/pages/checkout-cancel";
 
@@ -44,6 +45,7 @@ function Router() {
         <Route path="/profile/:id/earnings" component={Earnings} />
         <Route path="/notifications" component={Notifications} />
         <Route path="/moderation" component={Moderation} />
+        <Route path="/support" component={Support} />
         <Route path="/checkout/success" component={CheckoutSuccess} />
         <Route path="/checkout/cancel" component={CheckoutCancel} />
         <Route component={NotFound} />

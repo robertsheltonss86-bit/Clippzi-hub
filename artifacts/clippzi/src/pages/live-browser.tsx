@@ -12,6 +12,9 @@ import { Switch } from "@/components/ui/switch";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { usePayoutMethod } from "@/hooks/use-payout-method";
+import { PayoutSetup } from "@/components/payout/payout-setup";
+import { apiFetch } from "@/lib/api-fetch";
 
 export default function LiveBrowser() {
   const { userId, isAuthenticated, login } = useCurrentUser();
@@ -26,6 +29,8 @@ export default function LiveBrowser() {
   const [category, setCategory] = useState("");
   const [groupMode, setGroupMode] = useState(false);
   const [starting, setStarting] = useState(false);
+  const { data: payout, refetch: refetchPayout } = usePayoutMethod(userId ?? 0, isAuthenticated && !!userId);
+  const [payoutOpen, setPayoutOpen] = useState(false);
 
   const handleGoLive = async () => {
     if (!isAuthenticated || !userId) { login(); return; }
@@ -33,13 +38,18 @@ export default function LiveBrowser() {
       toast({ title: "Title is required", variant: "destructive" });
       return;
     }
+    if (!payout?.hasPayout) {
+      setOpen(false);
+      setPayoutOpen(true);
+      toast({ title: "One quick step first", description: "Set up how you want to get paid before going live." });
+      return;
+    }
     setStarting(true);
     try {
-      // Use plain fetch so we can pass `mode` (not in generated client types yet)
-      const base = import.meta.env.BASE_URL;
-      const res = await fetch(`${base}api/livestreams`, {
+      // Hand-written call (apiFetch) so we can pass `mode` (not in the generated
+      // client types yet) while still sending cookie + Bearer auth.
+      const res = await apiFetch("api/livestreams", {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId,
@@ -50,6 +60,12 @@ export default function LiveBrowser() {
         }),
       });
       const stream = await res.json();
+      if (res.status === 403 && stream?.error === "payout_required") {
+        setOpen(false);
+        setPayoutOpen(true);
+        toast({ title: "One quick step first", description: stream?.message || "Set up your payout before going live." });
+        return;
+      }
       if (!res.ok) throw new Error(stream?.error || "Failed");
       queryClient.invalidateQueries({ queryKey: getListLivestreamsQueryKey() });
       setOpen(false);
@@ -168,6 +184,27 @@ export default function LiveBrowser() {
           <p className="text-sm">Be the first to go live!</p>
         </div>
       )}
+
+      <Dialog open={payoutOpen} onOpenChange={setPayoutOpen}>
+        <DialogContent className="bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-white">How do you want to get paid?</DialogTitle>
+            <DialogDescription>Set this up once so your earnings can reach you. It's required before you go live.</DialogDescription>
+          </DialogHeader>
+          {userId ? (
+            <PayoutSetup
+              userId={userId}
+              currentMethod={payout?.payoutMethod}
+              currentHandle={payout?.payoutHandle}
+              onSaved={() => {
+                setPayoutOpen(false);
+                refetchPayout();
+                toast({ title: "You're ready to go live! 🔴", description: "Tap Go Live again to start." });
+              }}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -4,12 +4,13 @@ import {
   getListModerationReportsQueryKey,
   useResolveModerationReport,
 } from "@workspace/api-client-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Banknote, DollarSign, TrendingUp, Users, ExternalLink, Info, AlertTriangle, Bot, Check, Trash2 } from "lucide-react";
+import { Shield, Banknote, DollarSign, TrendingUp, Users, ExternalLink, Info, AlertTriangle, Bot, Check, Trash2, LifeBuoy, CheckCircle2, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiFetch } from "@/lib/api-fetch";
 
 const apiBase = `${import.meta.env.BASE_URL}api`;
 const fmt = (n: number) =>
@@ -122,6 +123,98 @@ function ModerationQueue() {
   );
 }
 
+function ProblemReports() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { data: reports, isLoading } = useQuery<any[]>({
+    queryKey: ["problem-reports"],
+    queryFn: async () => {
+      const r = await apiFetch("api/support/reports");
+      if (!r.ok) throw new Error("failed");
+      return r.json();
+    },
+    refetchInterval: 15000,
+  });
+  const resolve = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: "open" | "resolved" }) => {
+      const r = await apiFetch(`api/support/reports/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (!r.ok) throw new Error("failed");
+      return r.json();
+    },
+    onSuccess: (_d, v) => {
+      queryClient.invalidateQueries({ queryKey: ["problem-reports"] });
+      toast({ title: v.status === "resolved" ? "Marked resolved" : "Reopened" });
+    },
+    onError: (e: any) => toast({ title: "Action failed", description: String(e?.message ?? e), variant: "destructive" }),
+  });
+
+  const openCount = reports?.filter((r) => r.status !== "resolved").length ?? 0;
+
+  return (
+    <Card className="mb-6">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <LifeBuoy className="w-5 h-5 text-primary" /> Problem Reports
+          {openCount > 0 && (
+            <Badge variant="outline" className="border-primary text-primary">{openCount} open</Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">Loading reports…</p>
+        ) : !reports || reports.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-6 text-center">No problem reports yet. 🎉</p>
+        ) : (
+          <div className="space-y-3">
+            {reports.map((r: any) => {
+              const resolved = r.status === "resolved";
+              return (
+                <div key={r.id} className={`p-4 rounded-md border flex flex-col gap-2 ${resolved ? "bg-card/30 opacity-70" : "bg-card/50"}`} data-testid={`problem-report-${r.id}`}>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">{r.category}</Badge>
+                      <span className="text-xs text-muted-foreground">
+                        by {r.reporter?.displayName ?? r.reporter?.username ?? `user #${r.userId}`}
+                      </span>
+                      {resolved && (
+                        <span className="flex items-center gap-1 text-xs text-emerald-400"><CheckCircle2 className="w-3.5 h-3.5" /> resolved</span>
+                      )}
+                    </div>
+                    <span className="text-[11px] text-muted-foreground">{new Date(r.createdAt).toLocaleString()}</span>
+                  </div>
+                  <p className="text-sm text-white/90">{r.message}</p>
+                  {r.aiResponse && (
+                    <div className="text-xs text-muted-foreground border-l-2 border-primary/40 pl-3 whitespace-pre-wrap">
+                      <span className="flex items-center gap-1 text-primary mb-1"><Bot className="w-3.5 h-3.5" /> AI reply sent</span>
+                      {r.aiResponse}
+                    </div>
+                  )}
+                  <div className="flex gap-2 pt-1">
+                    {resolved ? (
+                      <Button size="sm" variant="outline" disabled={resolve.isPending} onClick={() => resolve.mutate({ id: r.id, status: "open" })} data-testid={`button-reopen-${r.id}`}>
+                        <RotateCcw className="w-3.5 h-3.5 mr-1" /> Reopen
+                      </Button>
+                    ) : (
+                      <Button size="sm" disabled={resolve.isPending} onClick={() => resolve.mutate({ id: r.id, status: "resolved" })} data-testid={`button-resolve-${r.id}`}>
+                        <Check className="w-3.5 h-3.5 mr-1" /> Mark resolved
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Moderation() {
   const { data: earnings } = useGetPlatformEarnings();
 
@@ -147,6 +240,8 @@ export default function Moderation() {
       <p className="text-sm text-muted-foreground mb-6">Content moderation queue and your 40% platform revenue from gifts (powered by Stripe Connect)</p>
 
       <ModerationQueue />
+
+      <ProblemReports />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card>
