@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { moderationReportsTable, notificationsTable, usersTable, postsTable, commentsTable, liveChatMessagesTable } from "@workspace/db";
 import { eq, desc, sql } from "drizzle-orm";
+import { requireAuth, requireAdmin } from "../middlewares/authMiddleware";
 import {
   ListModerationReportsQueryParams,
   CreateModerationReportBody,
@@ -47,8 +48,8 @@ function analyzeText(text: string) {
   };
 }
 
-// GET /moderation/reports
-router.get("/moderation/reports", async (req, res) => {
+// GET /moderation/reports (admin-only review queue)
+router.get("/moderation/reports", requireAdmin, async (req, res) => {
   try {
     const query = ListModerationReportsQueryParams.parse(req.query);
     let q = db.select().from(moderationReportsTable).$dynamic();
@@ -73,12 +74,14 @@ router.get("/moderation/reports", async (req, res) => {
   }
 });
 
-// POST /moderation/reports
-router.post("/moderation/reports", async (req, res) => {
+// POST /moderation/reports (any logged-in user can report content)
+router.post("/moderation/reports", requireAuth, async (req, res) => {
   try {
     const body = CreateModerationReportBody.parse(req.body);
+    // Trust the authenticated user for the reporter id, never the request body.
+    const reporterId = req.user!.appUserId ?? body.reporterId;
     const [report] = await db.insert(moderationReportsTable).values({
-      reporterId: body.reporterId,
+      reporterId,
       contentType: body.contentType as "post" | "comment" | "user" | "stream",
       contentId: body.contentId,
       reason: body.reason as "bullying" | "harassment" | "drugs" | "spam" | "nudity" | "violence" | "other",
@@ -104,7 +107,7 @@ router.post("/moderation/reports", async (req, res) => {
 });
 
 // POST /moderation/analyze
-router.post("/moderation/analyze", async (req, res) => {
+router.post("/moderation/analyze", requireAuth, async (req, res) => {
   try {
     const { text } = req.body as { text: string; context?: string };
     if (!text) return res.status(400).json({ error: "text is required" });
@@ -115,8 +118,8 @@ router.post("/moderation/analyze", async (req, res) => {
   }
 });
 
-// PATCH /moderation/reports/:id
-router.patch("/moderation/reports/:id", async (req, res) => {
+// PATCH /moderation/reports/:id (admin-only — resolves/removes reported content)
+router.patch("/moderation/reports/:id", requireAdmin, async (req, res) => {
   try {
     const { id } = ResolveModerationReportParams.parse({ id: Number(req.params.id) });
     const body = ResolveModerationReportBody.parse(req.body);

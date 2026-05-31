@@ -24,6 +24,17 @@ function ModerationQueue() {
   );
   const resolve = useResolveModerationReport();
 
+  // Highest-severity first: AI score desc, then most recent. Reports without an
+  // AI score (manual user reports) sort below scored ones but above resolved.
+  const sortedReports = reports
+    ? [...reports].sort((a: any, b: any) => {
+        const sa = typeof a.aiScore === "number" ? a.aiScore : -1;
+        const sb = typeof b.aiScore === "number" ? b.aiScore : -1;
+        if (sb !== sa) return sb - sa;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      })
+    : reports;
+
   const act = (id: number, status: "actioned" | "dismissed") => {
     resolve.mutate(
       { id, data: { status } },
@@ -54,7 +65,7 @@ function ModerationQueue() {
           <p className="text-sm text-muted-foreground py-6 text-center">Nothing to review — all clear. 🎉</p>
         ) : (
           <div className="space-y-3">
-            {reports.map((r: any) => {
+            {sortedReports!.map((r: any) => {
               const isAI = !r.reporter;
               return (
                 <div key={r.id} className="p-4 rounded-md border bg-card/50 flex flex-col gap-2" data-testid={`report-${r.id}`}>

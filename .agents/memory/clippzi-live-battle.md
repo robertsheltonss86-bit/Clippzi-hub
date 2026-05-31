@@ -14,6 +14,11 @@ description: How the two-host "battle" mode renders video and stores scores — 
 - The opponent tile should connect straight to the opponent's room id (the battle-opponent stream id), not via a cached "all live streams" list — the list can be stale/missing the opponent and is capped, so the video silently fails to bind. Use the cached list only for cosmetic name/avatar.
 - The cross-room viewer should NOT use adaptiveStream for always-on-screen tiles (it can pause/never-subscribe a small tile). Only flip the viewer to "live" when a video track actually attaches, and only show "waiting" on host-disconnect if no host participant remains (avoids reconnect flicker).
 
+## Moderation endpoint auth (admin model)
+- Admin gating uses `req.user.isAdmin` via the `requireAdmin` middleware (alongside `requireAuth`/`requireSelf`) in the api-server auth middleware. The client mirrors this with `isAdmin` from `useCurrentUser` (the /moderation nav + page are admin-only).
+- The moderation report list and the destructive resolve/PATCH (which rejects posts / deletes comments + live-chat rows) must be `requireAdmin`. Report creation and the analyze endpoint are `requireAuth` (any logged-in user), and report creation must take the reporter id from the authenticated user, never the request body.
+- The admin moderation queue is sorted highest-severity-first (AI score desc, then recency).
+
 ## Battle endpoint auth
 - The direct battle endpoints (POST /battle start, DELETE /battle end, POST /battle/score) are host-only (requireAuth + stream.userId === appUserId). The client UI drives battles through the request/accept flow and ends via DELETE /battle; /battle/score is effectively unused by the client because gifts score server-side in checkout.ts.
 
