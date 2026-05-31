@@ -31,3 +31,7 @@ description: How the two-host "battle" mode renders video and stores scores — 
 ## Live-stream right action rail (mobile overflow)
 - The TikTok-style right rail on the live-stream page is absolutely positioned and grows UPWARD from a bottom anchor. A host sees more buttons than a viewer (Share, Who's Live, Cohost, Battle/End, Filter), so a bottom-only anchor pushed the TOP buttons (Share, Who's Live) off-screen behind the header/notch — they looked "missing".
 - Fix: bound the rail with BOTH a top (safe-area + header offset) and bottom (above the 38% chat overlay), keep the most-used buttons first/top, and make it overflow-y-auto with non-shrinking children. Adding more rail buttons later must respect this bounded+scroll container, not a fixed bottom anchor.
+
+## Feed live discovery + a testing gotcha
+- "See who's live while scrolling posts": the feed (home.tsx) has a persistent LIVE pill pinned OUTSIDE the scroll container (the post scroller is nested) that opens a bottom sheet of live creators. An in-scroll avatars strip also exists but scrolls away — that strip alone is why users couldn't find live people mid-scroll.
+- TEST GOTCHA: manually setting a livestream row to status='live' in the DB will get auto-ended within one or two GET /livestreams sweeps if a STALE in-memory host heartbeat exists from an earlier manual test (sweep ends live streams whose seeded heartbeat is >90s old). To screenshot a live feed, restart the api-server workflow first (clears the in-memory heartbeat map), then set the row live, then load the page promptly.

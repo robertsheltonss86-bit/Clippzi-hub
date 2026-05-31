@@ -1,7 +1,8 @@
-import { useGetFeed, getGetFeedQueryKey, useListLivestreams, useLikePost, useSharePost } from "@workspace/api-client-react";
+import { useGetFeed, getGetFeedQueryKey, useListLivestreams, getListLivestreamsQueryKey, useLikePost, useSharePost } from "@workspace/api-client-react";
 import type { Post } from "@workspace/api-client-react";
-import { Heart, MessageCircle, Share2, Play, Volume2, VolumeX } from "lucide-react";
+import { Heart, MessageCircle, Share2, Play, Volume2, VolumeX, Radio, Eye } from "lucide-react";
 import { CommentsSheet } from "@/components/comments-sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useState, useRef, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
@@ -13,7 +14,7 @@ import { StoriesBar } from "@/components/stories/stories-bar";
 export default function Home() {
   const { userId, isAuthenticated, login } = useCurrentUser();
   const { data: posts, isLoading } = useGetFeed(undefined, { query: { queryKey: getGetFeedQueryKey() } });
-  const { data: streams } = useListLivestreams();
+  const { data: streams } = useListLivestreams(undefined, { query: { queryKey: getListLivestreamsQueryKey(), refetchInterval: 15000 } });
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const likeMutation = useLikePost();
@@ -23,6 +24,7 @@ export default function Home() {
   const [likeDeltas, setLikeDeltas] = useState<Record<number, number>>({});
   const [shareDeltas, setShareDeltas] = useState<Record<number, number>>({});
   const [muted, setMuted] = useState(true);
+  const [liveOpen, setLiveOpen] = useState(false);
   // Mirror muted in a ref so the IntersectionObserver always reads the latest
   // value without needing to be re-created on every toggle.
   const mutedRef = useRef(true);
@@ -152,7 +154,66 @@ export default function Home() {
   }
 
   return (
-    <div className="relative h-full w-full bg-black overflow-y-scroll snap-y snap-mandatory scrollbar-hide">
+    <div className="relative h-full w-full bg-black">
+      {/* Persistent "who's live" button — stays pinned on top of the feed while
+          you scroll through posts so you can always jump into a live stream. */}
+      {streams && streams.length > 0 && (
+        <Sheet open={liveOpen} onOpenChange={setLiveOpen}>
+          <SheetTrigger asChild>
+            <button
+              className="absolute top-4 right-4 z-30 flex items-center gap-2 rounded-full bg-secondary px-3 py-1.5 shadow-lg shadow-secondary/30 active:scale-95 transition"
+              data-testid="button-whos-live"
+              aria-label="See who's live"
+            >
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-white opacity-75 animate-ping" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white" />
+              </span>
+              <span className="text-xs font-bold uppercase tracking-wide text-white">Live</span>
+              <span className="rounded-full bg-black/30 px-1.5 text-xs font-bold text-white">{streams.length}</span>
+            </button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="bg-card border-white/10 rounded-t-2xl max-h-[70%] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="flex items-center gap-2 text-white">
+                <Radio className="w-5 h-5 text-secondary" /> Live now
+              </SheetTitle>
+            </SheetHeader>
+            <div className="mt-4 flex flex-col gap-2 pb-4">
+              {streams.map((stream) => (
+                <Link href={`/live/${stream.id}`} key={stream.id}>
+                  <button
+                    onClick={() => setLiveOpen(false)}
+                    className="flex w-full items-center gap-3 rounded-xl bg-white/5 p-2.5 text-left active:bg-white/10 transition"
+                    data-testid={`live-row-${stream.id}`}
+                  >
+                    <div className="relative shrink-0">
+                      <img
+                        src={stream.user?.avatarUrl || "/assets/avatar1.png"}
+                        alt={stream.user?.displayName || ""}
+                        className="w-12 h-12 rounded-full object-cover border-2 border-secondary"
+                      />
+                      <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 bg-secondary text-white text-[9px] font-bold px-1.5 rounded-sm uppercase tracking-wider">
+                        Live
+                      </div>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold text-white">{stream.user?.displayName || stream.user?.username || "Creator"}</p>
+                      <p className="truncate text-xs text-white/60">{stream.title}</p>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-white/70">
+                      <Eye className="w-3.5 h-3.5" />
+                      {stream.viewerCount ?? 0}
+                    </div>
+                  </button>
+                </Link>
+              ))}
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
+
+      <div className="relative h-full w-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide">
       <div className="absolute top-0 left-0 w-full z-10 bg-gradient-to-b from-black/80 to-transparent p-4 flex flex-col gap-4">
         <StoriesBar />
         {streams && streams.length > 0 && (
@@ -308,6 +369,7 @@ export default function Home() {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
