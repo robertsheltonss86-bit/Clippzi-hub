@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { moderationReportsTable, notificationsTable, usersTable, postsTable, commentsTable, liveChatMessagesTable } from "@workspace/db";
 import { eq, desc, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../middlewares/authMiddleware";
+import { moderateText } from "../lib/moderation";
 import {
   ListModerationReportsQueryParams,
   CreateModerationReportBody,
@@ -14,39 +15,6 @@ import {
 } from "@workspace/api-zod";
 
 const router = Router();
-
-// Keyword-based AI moderation
-function analyzeText(text: string) {
-  const lower = text.toLowerCase();
-  const bullyingWords = ["stupid", "idiot", "loser", "ugly", "worthless", "hate you", "kill yourself", "kys"];
-  const drugWords = ["cocaine", "meth", "heroin", "fentanyl", "crack", "weed", "marijuana", "mdma", "ecstasy", "lsd", "acid"];
-  const harassWords = ["stalking", "threat", "follow you", "find you", "address"];
-
-  const bullyingScore = bullyingWords.reduce((s, w) => lower.includes(w) ? s + 0.3 : s, 0);
-  const drugScore = drugWords.reduce((s, w) => lower.includes(w) ? s + 0.4 : s, 0);
-  const harassScore = harassWords.reduce((s, w) => lower.includes(w) ? s + 0.35 : s, 0);
-
-  const flags: string[] = [];
-  if (bullyingScore > 0) flags.push("bullying");
-  if (drugScore > 0) flags.push("drug_content");
-  if (harassScore > 0) flags.push("harassment");
-
-  const score = Math.min(bullyingScore + drugScore + harassScore, 1.0);
-  const isSafe = score < 0.3;
-
-  return {
-    isSafe,
-    score: Math.round(score * 100) / 100,
-    flags,
-    categories: {
-      bullying: Math.min(bullyingScore, 1),
-      drugUse: Math.min(drugScore, 1),
-      harassment: Math.min(harassScore, 1),
-      spam: 0,
-    },
-    recommendation: score > 0.7 ? "block" : score > 0.4 ? "review" : score > 0.2 ? "warn" : "allow" as "allow" | "warn" | "review" | "block",
-  };
-}
 
 // GET /moderation/reports (admin-only review queue)
 router.get("/moderation/reports", requireAdmin, async (req, res) => {
@@ -106,13 +74,19 @@ router.post("/moderation/reports", requireAuth, async (req, res) => {
   }
 });
 
-// POST /moderation/analyze
+// POST /moderation/analyze — uses the canonical AI moderation engine.
 router.post("/moderation/analyze", requireAuth, async (req, res) => {
   try {
     const { text } = req.body as { text: string; context?: string };
     if (!text) return res.status(400).json({ error: "text is required" });
-    const result = analyzeText(text);
-    res.json(result);
+    const result = await moderateText(text);
+    res.json({
+      isSafe: result.decision === "allow",
+      score: result.score,
+      flags: result.flags,
+      reason: result.reason,
+      recommendation: result.decision,
+    });
   } catch (e) {
     res.status(400).json({ error: String(e) });
   }

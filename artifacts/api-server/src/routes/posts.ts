@@ -112,6 +112,11 @@ router.get("/posts/:id", async (req, res) => {
     const { id } = GetPostParams.parse({ id: Number(req.params.id) });
     const [post] = await db.select().from(postsTable).where(eq(postsTable.id, id));
     if (!post) return res.status(404).json({ error: "Post not found" });
+    // Content an admin removed (moderationStatus = 'rejected') must not be
+    // reachable via deep link by anyone but an admin.
+    if (post.moderationStatus === "rejected" && req.user?.isAdmin !== true) {
+      return res.status(404).json({ error: "Post not found" });
+    }
     await db.update(postsTable).set({ viewCount: sql`${postsTable.viewCount} + 1` }).where(eq(postsTable.id, id));
     res.json(await enrichPost(post));
   } catch (e) {
