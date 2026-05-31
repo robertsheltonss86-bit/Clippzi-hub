@@ -27,6 +27,7 @@ import { LiveKitBroadcaster, LiveKitViewer } from "@/components/live/livekit-sta
 import { GroupRoomProvider, LiveKitGroupStage } from "@/components/live/livekit-group-room";
 import { CohostPanel } from "@/components/live/cohost-panel";
 import { GamesPanel } from "@/components/live/games-panel";
+import { formatPoints } from "@/lib/points";
 
 function formatCount(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -198,7 +199,7 @@ export default function LiveStream() {
         toast({ title: "Checkout failed", description: data.error ?? `HTTP ${r.status}`, variant: "destructive" });
         return;
       }
-      toast({ title: "Opening Stripe Checkout…", description: `Pay $${price.toFixed(2)} to send ${name}` });
+      toast({ title: "Opening Stripe Checkout…", description: `Send ${name} • ${formatPoints(price)} points` });
       window.location.href = data.url;
     } catch (e: any) {
       toast({ title: "Checkout failed", description: String(e?.message ?? e), variant: "destructive" });
@@ -368,15 +369,28 @@ export default function LiveStream() {
         {battleActive ? (
           <div className="absolute inset-0 grid grid-cols-2 gap-0">
             <div className="relative bg-zinc-900 overflow-hidden">
-              <img src={stream?.thumbnailUrl || "https://images.unsplash.com/photo-1511512578047-dfb367046420"} alt="" className="w-full h-full object-cover opacity-60" />
-              <div className="absolute bottom-3 left-3 flex items-center gap-2 bg-black/70 rounded-full px-3 py-1.5">
+              {isOwnStream ? (
+                <LiveKitBroadcaster streamId={streamId} filterCss={filterCss} />
+              ) : (
+                <LiveKitViewer streamId={streamId} posterUrl={stream?.thumbnailUrl ?? undefined} />
+              )}
+              <div className="absolute bottom-3 left-3 z-20 flex items-center gap-2 bg-black/70 rounded-full px-3 py-1.5 pointer-events-none">
                 <img src={stream?.user?.avatarUrl || "/assets/avatar1.png"} alt="" className="w-7 h-7 rounded-full" />
                 <span className="text-white text-sm font-semibold">{stream?.user?.displayName}</span>
               </div>
             </div>
             <div className="relative bg-zinc-900 overflow-hidden border-l-2 border-secondary">
-              <img src={opponent?.thumbnailUrl || "https://images.unsplash.com/photo-1511512578047-dfb367046420"} alt="" className="w-full h-full object-cover opacity-60" />
-              <div className="absolute bottom-3 right-3 flex items-center gap-2 bg-black/70 rounded-full px-3 py-1.5">
+              {opponent ? (
+                <LiveKitViewer streamId={opponent.id} posterUrl={opponent.thumbnailUrl ?? undefined} />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center text-center text-muted-foreground p-4">
+                  <div>
+                    <Swords className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                    <p className="text-sm">Waiting for opponent…</p>
+                  </div>
+                </div>
+              )}
+              <div className="absolute bottom-3 right-3 z-20 flex items-center gap-2 bg-black/70 rounded-full px-3 py-1.5 pointer-events-none">
                 <span className="text-white text-sm font-semibold">{opponent?.user?.displayName ?? "Opponent"}</span>
                 <img src={opponent?.user?.avatarUrl || "/assets/avatar2.png"} alt="" className="w-7 h-7 rounded-full" />
               </div>
@@ -470,9 +484,9 @@ export default function LiveStream() {
             <div className="pointer-events-auto mx-auto w-full max-w-xl">
               <div className="bg-black/70 backdrop-blur rounded-xl p-3 border border-accent/40">
                 <div className="flex items-center justify-between text-xs text-white mb-2 font-bold">
-                  <span className="text-primary">{stream?.user?.displayName} • ${myScore.toFixed(2)}</span>
+                  <span className="text-primary">{stream?.user?.displayName} • {formatPoints(myScore)} pts</span>
                   <span className="text-accent flex items-center gap-1"><Swords className="w-3 h-3" /> {Math.floor(battleSecondsLeft / 60)}:{String(battleSecondsLeft % 60).padStart(2, "0")}</span>
-                  <span className="text-secondary">${oppScore.toFixed(2)} • {opponent?.user?.displayName ?? "Opponent"}</span>
+                  <span className="text-secondary">{formatPoints(oppScore)} pts • {opponent?.user?.displayName ?? "Opponent"}</span>
                 </div>
                 <div className="h-3 w-full rounded-full bg-secondary overflow-hidden">
                   <div className="h-full bg-primary transition-all duration-500" style={{ width: `${myPct}%` }} />
@@ -694,7 +708,7 @@ export default function LiveStream() {
                             <span className="text-4xl mb-1 drop-shadow-md">{gift.emoji}</span>
                           )}
                           <span className="text-[10px] text-white font-medium truncate w-full text-center">{gift.name}</span>
-                          <span className="text-[10px] text-primary font-bold">${Number(gift.price).toFixed(2)}</span>
+                          <span className="text-[10px] text-primary font-bold">{formatPoints(gift.price)} pts</span>
                         </button>
                       ))}
                     </div>
@@ -744,8 +758,8 @@ export default function LiveStream() {
 
         {isOwnStream ? (
           <div className="h-20 border-t border-border bg-black/40 px-3 py-2 flex items-center justify-between">
-            <div className="text-xs text-muted-foreground">💝 Gifts received this stream</div>
-            <div className="text-lg font-bold text-primary">${Number(stream?.totalGiftsReceived ?? 0).toFixed(2)}</div>
+            <div className="text-xs text-muted-foreground">💝 Points earned this stream</div>
+            <div className="text-lg font-bold text-primary">{formatPoints(stream?.totalGiftsReceived)} pts</div>
           </div>
         ) : (
           <div className="h-44 border-t border-border bg-black/40 p-2 flex flex-col gap-2">
@@ -763,7 +777,7 @@ export default function LiveStream() {
                       <span className="text-2xl mb-1 drop-shadow-md">{gift.emoji}</span>
                     )}
                     <span className="text-[10px] text-white font-medium truncate w-full text-center">{gift.name}</span>
-                    <span className="text-[10px] text-primary font-bold">${Number(gift.price).toFixed(2)}</span>
+                    <span className="text-[10px] text-primary font-bold">{formatPoints(gift.price)} pts</span>
                   </button>
                 ))}
               </div>

@@ -251,6 +251,9 @@ router.post("/livestreams/:id/battle/score", async (req, res) => {
     const pts = Number(points);
     if (!Number.isFinite(id) || !Number.isFinite(pts)) return res.status(400).json({ error: "Invalid" });
     if (pts <= 0 || pts > 1000) return res.status(400).json({ error: "Points must be between 0 and 1000" });
+    // battleScore is stored in dollars (1 point = 1 cent), same unit as gift totals,
+    // so convert the incoming points to dollars before incrementing.
+    const dollars = pts / 100;
 
     const result = await db.transaction(async (tx) => {
       const [current] = await tx.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
@@ -258,10 +261,10 @@ router.post("/livestreams/:id/battle/score", async (req, res) => {
       if (!current.battleOpponentId || !current.battleEndsAt) return { error: "No active battle", status: 409 as const };
       if (new Date(current.battleEndsAt).getTime() <= Date.now()) return { error: "Battle has expired", status: 409 as const };
       const [stream] = await tx.update(livestreamsTable).set({
-        battleScore: sql`${livestreamsTable.battleScore} + ${pts}`,
+        battleScore: sql`${livestreamsTable.battleScore} + ${dollars}`,
       }).where(eq(livestreamsTable.id, id)).returning();
       await tx.update(livestreamsTable).set({
-        battleOpponentScore: sql`${livestreamsTable.battleOpponentScore} + ${pts}`,
+        battleOpponentScore: sql`${livestreamsTable.battleOpponentScore} + ${dollars}`,
       }).where(eq(livestreamsTable.id, current.battleOpponentId));
       return { stream };
     });

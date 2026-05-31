@@ -125,9 +125,25 @@ router.post("/checkout/gift/confirm", requireAuth, async (req, res) => {
     const tx = inserted[0];
 
     if (streamId) {
+      const [ls] = await db.select().from(livestreamsTable).where(eq(livestreamsTable.id, streamId));
       await db.update(livestreamsTable)
         .set({ totalGiftsReceived: sql`${livestreamsTable.totalGiftsReceived} + ${total}` })
         .where(eq(livestreamsTable.id, streamId));
+
+      // If this stream is in an active battle, the gift value also counts toward
+      // the battle score (stored in dollars, shown to users as points elsewhere).
+      const battleLive =
+        ls?.battleOpponentId != null &&
+        ls?.battleEndsAt != null &&
+        new Date(ls.battleEndsAt).getTime() > Date.now();
+      if (battleLive) {
+        await db.update(livestreamsTable)
+          .set({ battleScore: sql`${livestreamsTable.battleScore} + ${total}` })
+          .where(eq(livestreamsTable.id, streamId));
+        await db.update(livestreamsTable)
+          .set({ battleOpponentScore: sql`${livestreamsTable.battleOpponentScore} + ${total}` })
+          .where(eq(livestreamsTable.id, ls!.battleOpponentId!));
+      }
     }
 
     res.status(201).json({ transactionId: tx.id, amount: total, streamerShare, platformShare });

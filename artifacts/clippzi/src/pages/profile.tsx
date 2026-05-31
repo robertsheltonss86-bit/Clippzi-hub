@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Camera, Edit2, CheckCircle, Heart, Play, Users, Video, Eye, BadgeCheck, DollarSign, Trash2, LogOut, MessageCircle } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { formatPoints } from "@/lib/points";
 
 function StatBox({ label, value }: { label: string; value: string | number }) {
   return (
@@ -316,7 +317,7 @@ export default function Profile() {
           <StatBox label="Following" value={user.followingCount ?? 0} />
           <StatBox label="Posts" value={user.postCount ?? 0} />
           {stats && <StatBox label="Total Views" value={stats.totalViews ?? 0} />}
-          {stats && <StatBox label="Gifts Received" value={`$${Number(stats.totalGiftsReceived ?? 0).toFixed(2)}`} />}
+          {stats && <StatBox label="Points Earned" value={`${formatPoints(stats.totalGiftsReceived)} pts`} />}
         </div>
 
         {/* Posts grid */}

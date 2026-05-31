@@ -1,2 +1,3 @@
 - [DB schema changes](db-schema-workflow.md) — drizzle-kit push needs a TTY and hangs here; create/alter tables with executeSql instead.
 - [OpenAPI codegen](openapi-codegen.md) — orval fails on any `$ref` to a missing schema; there is no shared SuccessResponse — inline simple OK responses.
+- [Clippzi live battle](clippzi-live-battle.md) — battle = two separate LiveKit streams shown via Broadcaster/Viewer (not thumbnails); money cols are dollars, UI shows points via formatPoints (x100).
