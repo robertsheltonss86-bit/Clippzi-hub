@@ -11,6 +11,7 @@ import storageRouter from "./storage";
 import platformRouter from "./platform";
 import stripeConnectRouter from "./stripe-connect";
 import checkoutRouter from "./checkout";
+import coinsRouter from "./coins";
 import messagesRouter from "./messages";
 import storiesRouter from "./stories";
 
@@ -28,6 +29,7 @@ router.use(storageRouter);
 router.use(platformRouter);
 router.use(stripeConnectRouter);
 router.use(checkoutRouter);
+router.use(coinsRouter);
 router.use(messagesRouter);
 router.use(storiesRouter);
 

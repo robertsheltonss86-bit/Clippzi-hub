@@ -18,6 +18,7 @@ export const usersTable = pgTable("users", {
   followingCount: integer("following_count").notNull().default(0),
   postCount: integer("post_count").notNull().default(0),
   totalViews: integer("total_views").notNull().default(0),
+  coinBalance: integer("coin_balance").notNull().default(0),
   role: userRoleEnum("role").notNull().default("user"),
   stripeAccountId: text("stripe_account_id"),
   stripePayoutsEnabled: boolean("stripe_payouts_enabled").notNull().default(false),

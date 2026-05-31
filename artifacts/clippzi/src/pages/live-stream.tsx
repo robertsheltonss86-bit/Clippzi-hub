@@ -14,7 +14,7 @@ import {
 } from "@workspace/api-client-react";
 import { useParams, useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Gift as GiftIcon, Heart, Send, Sparkles, Filter, Swords, Share2, X, Check, ArrowLeft, ShieldCheck } from "lucide-react";
+import { Users, Gift as GiftIcon, Heart, Send, Sparkles, Filter, Swords, Share2, X, Check, ArrowLeft, ShieldCheck, Coins, Plus } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,9 @@ import { LiveKitBroadcaster, LiveKitViewer } from "@/components/live/livekit-sta
 import { GroupRoomProvider, LiveKitGroupStage } from "@/components/live/livekit-group-room";
 import { CohostPanel } from "@/components/live/cohost-panel";
 import { GamesPanel } from "@/components/live/games-panel";
+import { CoinStore } from "@/components/coins/coin-store";
+import { useCoinBalance } from "@/hooks/use-coin-balance";
+import { apiFetch } from "@/lib/api-fetch";
 import { formatPoints } from "@/lib/points";
 
 function formatCount(n: number) {
@@ -58,6 +61,9 @@ export default function LiveStream() {
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
   const [endingStream, setEndingStream] = useState(false);
+  const { balance: coinBalance, refetch: refetchBalance } = useCoinBalance();
+  const [coinStoreOpen, setCoinStoreOpen] = useState(false);
+  const [sendingGiftId, setSendingGiftId] = useState<number | null>(null);
 
   const endLiveStream = async (silent = false) => {
     if (!streamId) return;
@@ -187,23 +193,38 @@ export default function LiveStream() {
   const handleSendGift = async (giftId: number, name: string, price: number) => {
     if (!isAuthenticated || !CURRENT_USER_ID) { login(); return; }
     if (!stream?.userId) return;
+    if (sendingGiftId != null) return;
+    const coinCost = Math.round(price * 100);
+    if (coinBalance < coinCost) {
+      toast({ title: "Not enough coins", description: `${name} costs ${coinCost.toLocaleString()} coins. Top up to keep gifting.` });
+      setCoinStoreOpen(true);
+      return;
+    }
+    setSendingGiftId(giftId);
     try {
-      const base = import.meta.env.BASE_URL;
-      const r = await fetch(`${base}api/checkout/gift`, {
+      const r = await apiFetch("api/coins/gift", {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ giftId, receiverId: stream.userId, streamId, quantity: 1 }),
       });
       const data = await r.json();
-      if (!r.ok || !data.url) {
-        toast({ title: "Checkout failed", description: data.error ?? `HTTP ${r.status}`, variant: "destructive" });
+      if (r.status === 402) {
+        toast({ title: "Not enough coins", description: "Top up to keep gifting." });
+        await refetchBalance();
+        setCoinStoreOpen(true);
         return;
       }
-      toast({ title: "Opening Stripe Checkout…", description: `Send ${name} • ${formatPoints(price)} points` });
-      window.location.href = data.url;
+      if (!r.ok) {
+        toast({ title: "Couldn't send gift", description: data.error ?? `HTTP ${r.status}`, variant: "destructive" });
+        return;
+      }
+      toast({ title: `Sent ${name}! 🎁`, description: `−${coinCost.toLocaleString()} coins • ${formatPoints(price)} pts to the creator` });
+      await refetchBalance();
+      queryClient.invalidateQueries({ queryKey: getGetLivestreamQueryKey(streamId) });
     } catch (e: any) {
-      toast({ title: "Checkout failed", description: String(e?.message ?? e), variant: "destructive" });
+      toast({ title: "Couldn't send gift", description: String(e?.message ?? e), variant: "destructive" });
+    } finally {
+      setSendingGiftId(null);
     }
   };
 
@@ -701,24 +722,35 @@ export default function LiveStream() {
               </SheetTrigger>
               <SheetContent side="bottom" className="bg-card border-border h-[65vh] flex flex-col">
                 <SheetHeader>
-                  <SheetTitle className="text-white flex items-center gap-2"><span className="text-xl">🎁</span> Gift Chest</SheetTitle>
+                  <div className="flex items-center justify-between gap-2">
+                    <SheetTitle className="text-white flex items-center gap-2"><span className="text-xl">🎁</span> Gift Chest</SheetTitle>
+                    <button
+                      onClick={() => (isAuthenticated ? setCoinStoreOpen(true) : login())}
+                      className="flex items-center gap-1.5 rounded-full bg-black/50 border border-amber-400/50 pl-2.5 pr-1.5 py-1 text-sm font-bold text-amber-400 hover:bg-black/70 active:scale-95 transition"
+                      data-testid="button-open-coin-store"
+                    >
+                      <Coins className="w-4 h-4" />
+                      {coinBalance.toLocaleString()}
+                      <span className="flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-black"><Plus className="w-3.5 h-3.5" /></span>
+                    </button>
+                  </div>
                 </SheetHeader>
                 <p className="text-xs text-muted-foreground mt-1 mb-3">
                   {isOwnStream
                     ? `Send gifts to your co-hosts to hype them up${battleActive ? " • adds to battle score" : ""}`
-                    : `60/40 split — creator keeps 60%${battleActive ? " • adds to battle score" : ""}`}
+                    : `Spend coins • creator keeps 60%${battleActive ? " • adds to battle score" : ""}`}
                 </p>
                   <ScrollArea className="flex-1">
                     <div className="grid grid-cols-3 gap-2 pb-4">
                       {gifts?.map((gift) => (
-                        <button key={gift.id} onClick={() => handleSendGift(gift.id, gift.name, Number(gift.price))} className={`flex flex-col items-center justify-center p-2 rounded-lg bg-black/60 border-2 transition-all hover:scale-105 hover:bg-zinc-800 ${getRarityColor(gift.rarity)}`} data-testid={`button-gift-mobile-${gift.id}`}>
+                        <button key={gift.id} disabled={sendingGiftId != null} onClick={() => handleSendGift(gift.id, gift.name, Number(gift.price))} className={`flex flex-col items-center justify-center p-2 rounded-lg bg-black/60 border-2 transition-all hover:scale-105 hover:bg-zinc-800 disabled:opacity-50 ${getRarityColor(gift.rarity)}`} data-testid={`button-gift-mobile-${gift.id}`}>
                           {gift.iconUrl ? (
                             <img src={gift.iconUrl} alt={gift.name} className="w-16 h-16 object-contain mb-1 drop-shadow-[0_0_8px_rgba(0,0,0,0.6)]" loading="lazy" />
                           ) : (
                             <span className="text-4xl mb-1 drop-shadow-md">{gift.emoji}</span>
                           )}
                           <span className="text-[10px] text-white font-medium truncate w-full text-center">{gift.name}</span>
-                          <span className="text-[10px] text-primary font-bold">{formatPoints(gift.price)} pts</span>
+                          <span className="text-[10px] text-amber-400 font-bold flex items-center gap-0.5"><Coins className="w-2.5 h-2.5" />{Math.round(Number(gift.price) * 100).toLocaleString()}</span>
                         </button>
                       ))}
                     </div>
@@ -853,6 +885,8 @@ export default function LiveStream() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <CoinStore open={coinStoreOpen} onOpenChange={setCoinStoreOpen} balance={coinBalance} />
     </div>
   );
 }

@@ -2,6 +2,7 @@ export * from "./users";
 export * from "./posts";
 export * from "./livestreams";
 export * from "./gifts";
+export * from "./coins";
 export * from "./shop";
 export * from "./moderation";
 export * from "./payouts";

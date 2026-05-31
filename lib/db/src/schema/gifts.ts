@@ -30,6 +30,7 @@ export const giftTransactionsTable = pgTable("gift_transactions", {
   platformShare: numeric("platform_share", { precision: 10, scale: 2 }).notNull(),
   quantity: integer("quantity").notNull().default(1),
   message: text("message"),
+  coinCost: integer("coin_cost"),
   stripeSessionId: text("stripe_session_id").unique(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

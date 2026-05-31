@@ -10,8 +10,10 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Camera, Edit2, CheckCircle, Heart, Play, Users, Video, Eye, BadgeCheck, DollarSign, Trash2, LogOut, MessageCircle } from "lucide-react";
+import { Camera, Edit2, CheckCircle, Heart, Play, Users, Video, Eye, BadgeCheck, DollarSign, Trash2, LogOut, MessageCircle, Coins, Plus } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useCoinBalance } from "@/hooks/use-coin-balance";
+import { CoinStore } from "@/components/coins/coin-store";
 import { formatPoints } from "@/lib/points";
 
 function StatBox({ label, value }: { label: string; value: string | number }) {
@@ -90,6 +92,9 @@ export default function Profile() {
   const isOwnProfile = !!meId && userId === meId;
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+
+  const { balance: coinBalance } = useCoinBalance();
+  const [coinStoreOpen, setCoinStoreOpen] = useState(false);
 
   const [editOpen, setEditOpen] = useState(false);
   const [editDisplayName, setEditDisplayName] = useState("");
@@ -320,6 +325,28 @@ export default function Profile() {
           {stats && <StatBox label="Points Earned" value={`${formatPoints(stats.totalGiftsReceived)} pts`} />}
         </div>
 
+        {/* Coin wallet (own profile) */}
+        {isOwnProfile && (
+          <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-amber-400/30 bg-gradient-to-br from-amber-500/10 via-black to-black p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full bg-amber-500/20 border border-amber-400/40 flex items-center justify-center">
+                <Coins className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Coin balance</p>
+                <p className="text-xl font-bold text-white" data-testid="text-coin-balance">{coinBalance.toLocaleString()}</p>
+              </div>
+            </div>
+            <Button
+              onClick={() => (isAuthenticated ? setCoinStoreOpen(true) : login())}
+              className="bg-amber-500 text-black font-bold hover:bg-amber-400 gap-1.5"
+              data-testid="button-buy-coins"
+            >
+              <Plus className="w-4 h-4" /> Get Coins
+            </Button>
+          </div>
+        )}
+
         {/* Posts grid */}
         <div className="mb-8">
           <h2 className="text-white font-semibold mb-3 flex items-center gap-2">
@@ -474,6 +501,8 @@ export default function Profile() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <CoinStore open={coinStoreOpen} onOpenChange={setCoinStoreOpen} balance={coinBalance} />
     </div>
   );
 }
