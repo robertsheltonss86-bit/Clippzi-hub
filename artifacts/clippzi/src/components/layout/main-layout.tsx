@@ -1,11 +1,13 @@
 import { Link, useLocation } from "wouter";
-import { Home, Compass, Radio, PlusSquare, ShoppingBag, Bell, User, ShieldAlert, LogIn, LogOut, MessageCircle } from "lucide-react";
+import { Home, Compass, Radio, PlusSquare, ShoppingBag, Bell, User, ShieldAlert, LogIn, LogOut, MessageCircle, Coins, Plus } from "lucide-react";
 import { AnimatedLogo } from "./animated-logo";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Button } from "@/components/ui/button";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useGetUser } from "@workspace/api-client-react";
+import { CoinStore } from "@/components/coins/coin-store";
+import { useCoinBalance } from "@/hooks/use-coin-balance";
 
 // A circular "my account" avatar that links straight to the signed-in user's
 // own profile, where they can edit their photo, banner, and bio. It prefers the
@@ -47,7 +49,16 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { isAuthenticated, isAdmin, userId, user, login, logout, isLoading } = useCurrentUser();
   const { toast } = useToast();
+  const { balance: coinBalance } = useCoinBalance();
+  const [coinStoreOpen, setCoinStoreOpen] = useState(false);
   const isImmersive = /^\/live\/[^/]+$/.test(location);
+
+  // The treasure chest lets anyone top up coins from any page. Signed-out users
+  // are sent to log in first, since buying coins needs an account.
+  const openCoinStore = () => {
+    if (!isAuthenticated) { login(); return; }
+    setCoinStoreOpen(true);
+  };
 
   // One-time Community Guidelines welcome for newly signed-in users.
   useEffect(() => {
@@ -106,6 +117,22 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
+        <button
+          onClick={openCoinStore}
+          className="flex items-center gap-3 w-full rounded-lg bg-gradient-to-r from-amber-500/15 to-amber-600/10 border border-amber-400/40 px-3 py-2.5 hover:from-amber-500/25 hover:to-amber-600/20 active:scale-[0.98] transition"
+          data-testid="button-treasure-chest"
+          title="Get coins"
+        >
+          <img src={`${import.meta.env.BASE_URL}gifts/treasure-chest.png`} alt="" className="w-8 h-8 object-contain shrink-0 drop-shadow-[0_0_8px_rgba(251,191,36,0.6)]" />
+          <div className="flex-1 min-w-0 text-left">
+            <div className="text-sm font-bold text-amber-400 flex items-center gap-1">
+              <Coins className="w-3.5 h-3.5" /> {isAuthenticated ? coinBalance.toLocaleString() : "Get Coins"}
+            </div>
+            <div className="text-[11px] text-muted-foreground truncate">Buy coins to send gifts</div>
+          </div>
+          <span className="flex items-center justify-center w-6 h-6 rounded-full bg-amber-500 text-black shrink-0"><Plus className="w-4 h-4" /></span>
+        </button>
+
         <div className="border-t border-border pt-4">
           {isLoading ? (
             <div className="h-9" />
@@ -144,6 +171,9 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
               <div className="cursor-pointer"><AnimatedLogo /></div>
             </Link>
             <div className="flex gap-4 items-center">
+              <button onClick={openCoinStore} data-testid="button-treasure-chest-mobile" aria-label="Get coins" className="active:scale-95 transition">
+                <img src={`${import.meta.env.BASE_URL}gifts/treasure-chest.png`} alt="" className="w-7 h-7 object-contain drop-shadow-[0_0_6px_rgba(251,191,36,0.7)]" />
+              </button>
               <Link href="/messages"><MessageCircle className="w-6 h-6 text-foreground cursor-pointer" /></Link>
               <Link href="/notifications"><Bell className="w-6 h-6 text-foreground cursor-pointer" /></Link>
               {!isLoading && (
@@ -179,6 +209,8 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
           );
         })}
       </nav>
+
+      <CoinStore open={coinStoreOpen} onOpenChange={setCoinStoreOpen} balance={coinBalance} />
     </div>
   );
 }

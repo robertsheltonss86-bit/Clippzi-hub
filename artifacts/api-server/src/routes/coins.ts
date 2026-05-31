@@ -155,8 +155,8 @@ router.post("/coins/gift", requireAuth, async (req, res) => {
 
     const total = Number(gift.price) * qty; // dollars
     const coinCost = Math.round(Number(gift.price) * 100) * qty; // 1 coin = 1 cent
-    const streamerShare = total * 0.6;
-    const platformShare = total * 0.4;
+    const streamerShare = total * 0.7;
+    const platformShare = total * 0.3;
 
     const sid = streamId ? Number(streamId) : null;
 

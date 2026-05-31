@@ -738,7 +738,7 @@ export default function LiveStream() {
                 <p className="text-xs text-muted-foreground mt-1 mb-3">
                   {isOwnStream
                     ? `Send gifts to your co-hosts to hype them up${battleActive ? " • adds to battle score" : ""}`
-                    : `Spend coins • creator keeps 60%${battleActive ? " • adds to battle score" : ""}`}
+                    : `Spend coins • creator keeps 70%${battleActive ? " • adds to battle score" : ""}`}
                 </p>
                   <ScrollArea className="flex-1">
                     <div className="grid grid-cols-3 gap-2 pb-4">
@@ -807,7 +807,7 @@ export default function LiveStream() {
           <div className="h-44 border-t border-border bg-black/40 p-2 flex flex-col gap-2">
             <div className="flex items-center justify-between px-2 text-xs font-semibold text-muted-foreground uppercase">
               <span>Send Gifts {battleActive ? "(adds to battle score)" : ""}</span>
-              <span className="text-primary flex items-center gap-1"><GiftIcon className="w-3 h-3" /> 60/40 split</span>
+              <span className="text-primary flex items-center gap-1"><GiftIcon className="w-3 h-3" /> 70/30 split</span>
             </div>
             <ScrollArea className="flex-1">
               <div className="grid grid-cols-4 gap-2 pb-2">

@@ -50,8 +50,8 @@ router.post("/gifts/send", requireAdmin, async (req, res) => {
     const giftPrice = Number(gift.price);
     const quantity = body.quantity ?? 1;
     const totalAmount = giftPrice * quantity;
-    const streamerShare = totalAmount * 0.6;
-    const platformShare = totalAmount * 0.4;
+    const streamerShare = totalAmount * 0.7;
+    const platformShare = totalAmount * 0.3;
 
     const [tx] = await db.insert(giftTransactionsTable).values({
       giftId: body.giftId,

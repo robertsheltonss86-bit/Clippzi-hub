@@ -1,13 +1,16 @@
 import { useGetPost } from "@workspace/api-client-react";
 import { useParams, Link } from "wouter";
 import { useState, useRef } from "react";
-import { Heart, MessageCircle, Play, Volume2, VolumeX, ArrowLeft } from "lucide-react";
+import { Heart, MessageCircle, Play, Volume2, VolumeX, ArrowLeft, Gift } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { GiftSheet } from "@/components/coins/gift-sheet";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 export default function PostDetail() {
   const params = useParams<{ id: string }>();
   const postId = Number(params.id);
   const { data: post, isLoading, isError } = useGetPost(postId);
+  const { userId } = useCurrentUser();
 
   const [muted, setMuted] = useState(true);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -108,11 +111,23 @@ export default function PostDetail() {
             </span>
           )}
         </div>
-        <Link href="/">
-          <button className="mt-3 self-start px-6 py-3 rounded-full bg-primary text-black font-semibold" data-testid="button-open-clippzi">
-            Open in Clippzi
-          </button>
-        </Link>
+        <div className="mt-3 flex items-center gap-2">
+          <Link href="/">
+            <button className="px-6 py-3 rounded-full bg-primary text-black font-semibold" data-testid="button-open-clippzi">
+              Open in Clippzi
+            </button>
+          </Link>
+          {post.userId !== userId && (
+            <GiftSheet receiverId={post.userId}>
+              <button
+                className="px-6 py-3 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 text-black font-bold flex items-center gap-2 shadow-[0_0_14px_rgba(251,191,36,0.6)] active:scale-95 transition"
+                data-testid="button-gift-post"
+              >
+                <Gift className="w-5 h-5" /> Send Gift
+              </button>
+            </GiftSheet>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -98,8 +98,8 @@ router.post("/checkout/gift/confirm", requireAuth, async (req, res) => {
     if (!gift) return res.status(404).json({ error: "Gift no longer exists" });
 
     const total = Number(gift.price) * quantity;
-    const streamerShare = total * 0.6;
-    const platformShare = total * 0.4;
+    const streamerShare = total * 0.7;
+    const platformShare = total * 0.3;
 
     const inserted = await db.insert(giftTransactionsTable).values({
       giftId,

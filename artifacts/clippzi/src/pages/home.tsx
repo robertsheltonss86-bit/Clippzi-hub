@@ -1,7 +1,8 @@
 import { useGetFeed, getGetFeedQueryKey, useListLivestreams, getListLivestreamsQueryKey, useLikePost, useSharePost } from "@workspace/api-client-react";
 import type { Post } from "@workspace/api-client-react";
-import { Heart, MessageCircle, Share2, Play, Volume2, VolumeX, Radio, Eye } from "lucide-react";
+import { Heart, MessageCircle, Share2, Play, Volume2, VolumeX, Radio, Eye, Gift } from "lucide-react";
 import { CommentsSheet } from "@/components/comments-sheet";
+import { GiftSheet } from "@/components/coins/gift-sheet";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useState, useRef, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -347,6 +348,17 @@ export default function Home() {
                 </div>
                 <span className="text-sm font-semibold text-white drop-shadow-md">{shareCount > 0 ? shareCount : "Share"}</span>
               </button>
+
+              {post.userId !== userId && (
+                <GiftSheet receiverId={post.userId} onSent={() => queryClient.invalidateQueries({ queryKey: getGetFeedQueryKey() })}>
+                  <button className="flex flex-col items-center gap-1 group" data-testid={`button-gift-${post.id}`}>
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-[0_0_14px_rgba(251,191,36,0.6)] group-hover:scale-110 transition-all duration-300">
+                      <Gift className="w-7 h-7 text-black" />
+                    </div>
+                    <span className="text-sm font-semibold text-white drop-shadow-md">Gift</span>
+                  </button>
+                </GiftSheet>
+              )}
             </div>
 
             <div className="absolute bottom-4 left-4 right-20 flex flex-col gap-2">
