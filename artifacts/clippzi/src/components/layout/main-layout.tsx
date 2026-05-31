@@ -96,9 +96,12 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-[100dvh] w-full bg-background overflow-hidden text-foreground">
       <aside className="hidden md:flex flex-col w-[240px] border-r border-border bg-card p-4 space-y-8">
-        <Link href="/" className="flex items-center gap-3 cursor-pointer">
-          <AnimatedLogo />
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-3 cursor-pointer">
+            <AnimatedLogo />
+          </Link>
+          <WhosLiveButton variant="circle" testId="button-whos-live-desktop" />
+        </div>
 
         <nav className="flex flex-col space-y-2 flex-1">
           {navItems.map((item) => {
@@ -193,6 +196,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                   <Settings className="w-6 h-6 text-foreground cursor-pointer" />
                 </button>
               </SettingsMenu>
+              <WhosLiveButton variant="circle" testId="button-whos-live-mobile" />
               {!isLoading && (
                 isAuthenticated && userId ? (
                   <Link href={profileHref} data-testid="link-profile-bubble-mobile">
@@ -206,10 +210,6 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
               )}
             </div>
           </header>
-        )}
-
-        {!isImmersive && (
-          <WhosLiveButton className="absolute right-4 z-40 top-[calc(124px+env(safe-area-inset-top))] md:top-[120px]" />
         )}
 
         <div className={`flex-1 overflow-y-auto h-full w-full scroll-smooth ${isImmersive ? "" : "pb-[60px] md:pb-0 pt-[calc(70px+env(safe-area-inset-top))] md:pt-0"}`}>
