@@ -3,6 +3,7 @@ import {
   getGetLivestreamQueryKey,
   useListGifts,
   getListGiftsQueryKey,
+  getListLivestreamsQueryKey,
   useListLivestreams,
   useStartBattle,
   useEndBattle,
@@ -90,7 +91,7 @@ export default function LiveStream() {
     query: { enabled: !!streamId, queryKey: getGetLivestreamQueryKey(streamId), refetchInterval: 3000 },
   });
   const { data: gifts } = useListGifts(undefined, { query: { queryKey: getListGiftsQueryKey() } });
-  const { data: allStreams } = useListLivestreams();
+  const { data: allStreams } = useListLivestreams(undefined, { query: { queryKey: getListLivestreamsQueryKey(), refetchInterval: 5000 } });
   const { data: chatMessages } = useListLiveChat(streamId, {
     query: { enabled: !!streamId, queryKey: getListLiveChatQueryKey(streamId), refetchInterval: 2000 },
   });
@@ -366,48 +367,52 @@ export default function LiveStream() {
   return (
     <div className="flex flex-col lg:flex-row h-full w-full bg-black overflow-hidden relative">
       <div className="flex-1 relative bg-black flex flex-col justify-center items-center h-full">
-        {battleActive ? (
-          <div className="absolute inset-0 grid grid-cols-2 gap-0">
-            <div className="relative bg-zinc-900 overflow-hidden">
-              {isOwnStream ? (
-                <LiveKitBroadcaster streamId={streamId} filterCss={filterCss} />
-              ) : (
-                <LiveKitViewer streamId={streamId} posterUrl={stream?.thumbnailUrl ?? undefined} />
-              )}
-              <div className="absolute bottom-3 left-3 z-20 flex items-center gap-2 bg-black/70 rounded-full px-3 py-1.5 pointer-events-none">
-                <img src={stream?.user?.avatarUrl || "/assets/avatar1.png"} alt="" className="w-7 h-7 rounded-full" />
-                <span className="text-white text-sm font-semibold">{stream?.user?.displayName}</span>
-              </div>
-            </div>
-            <div className="relative bg-zinc-900 overflow-hidden border-l-2 border-secondary">
-              {opponent ? (
-                <LiveKitViewer streamId={opponent.id} posterUrl={opponent.thumbnailUrl ?? undefined} />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center text-center text-muted-foreground p-4">
-                  <div>
-                    <Swords className="w-10 h-10 mx-auto mb-2 opacity-40" />
-                    <p className="text-sm">Waiting for opponent…</p>
-                  </div>
-                </div>
-              )}
-              <div className="absolute bottom-3 right-3 z-20 flex items-center gap-2 bg-black/70 rounded-full px-3 py-1.5 pointer-events-none">
-                <span className="text-white text-sm font-semibold">{opponent?.user?.displayName ?? "Opponent"}</span>
-                <img src={opponent?.user?.avatarUrl || "/assets/avatar2.png"} alt="" className="w-7 h-7 rounded-full" />
-              </div>
-            </div>
-          </div>
-        ) : isGroup ? (
+        {isGroup ? (
           <GroupRoomProvider streamId={streamId}>
             <LiveKitGroupStage filterCss={filterCss} />
             <GamesPanel />
           </GroupRoomProvider>
-        ) : isOwnStream ? (
-          <div className="absolute inset-0 bg-black">
-            <LiveKitBroadcaster streamId={streamId} filterCss={filterCss} />
-          </div>
         ) : (
-          <div className="absolute inset-0 bg-black">
-            <LiveKitViewer streamId={streamId} posterUrl={stream?.thumbnailUrl ?? undefined} />
+          // Solo + battle share ONE stable layout so the host's camera (or the
+          // viewer's feed) is never unmounted/re-acquired when a battle starts/ends.
+          <div className={battleActive ? "absolute inset-0 grid grid-cols-2 gap-0" : "absolute inset-0 bg-black"}>
+            {/* OWN side — same React position whether or not a battle is active */}
+            <div className="relative h-full w-full bg-zinc-900 overflow-hidden">
+              {isOwnStream ? (
+                <LiveKitBroadcaster key="self-broadcast" streamId={streamId} filterCss={filterCss} />
+              ) : (
+                <LiveKitViewer key="self-view" streamId={streamId} posterUrl={stream?.thumbnailUrl ?? undefined} />
+              )}
+              {battleActive && (
+                <div className="absolute bottom-3 left-3 z-20 flex items-center gap-2 bg-black/70 rounded-full px-3 py-1.5 pointer-events-none">
+                  <img src={stream?.user?.avatarUrl || "/assets/avatar1.png"} alt="" className="w-7 h-7 rounded-full" />
+                  <span className="text-white text-sm font-semibold">{stream?.user?.displayName}</span>
+                </div>
+              )}
+            </div>
+            {/* OPPONENT side — only during a battle; connect straight to the opponent's room id */}
+            {battleActive && (
+              <div className="relative h-full w-full bg-zinc-900 overflow-hidden border-l-2 border-secondary">
+                {stream?.battleOpponentId ? (
+                  <LiveKitViewer
+                    key={`opp-${stream.battleOpponentId}`}
+                    streamId={stream.battleOpponentId}
+                    posterUrl={opponent?.thumbnailUrl ?? undefined}
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-center text-muted-foreground p-4">
+                    <div>
+                      <Swords className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">Waiting for opponent…</p>
+                    </div>
+                  </div>
+                )}
+                <div className="absolute bottom-3 right-3 z-20 flex items-center gap-2 bg-black/70 rounded-full px-3 py-1.5 pointer-events-none">
+                  <span className="text-white text-sm font-semibold">{opponent?.user?.displayName ?? "Opponent"}</span>
+                  <img src={opponent?.user?.avatarUrl || "/assets/avatar2.png"} alt="" className="w-7 h-7 rounded-full" />
+                </div>
+              </div>
+            )}
           </div>
         )}
 

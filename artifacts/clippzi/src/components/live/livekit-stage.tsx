@@ -191,6 +191,7 @@ export function LiveKitViewer({ streamId, posterUrl }: { streamId: number; poste
     if (!participant.identity.startsWith("host-")) return;
     if (track.kind === Track.Kind.Video && videoRef.current) {
       track.attach(videoRef.current);
+      setStatus("live");
     } else if (track.kind === Track.Kind.Audio && audioRef.current) {
       track.attach(audioRef.current);
       audioRef.current.play().catch(() => setNeedsUnmute(true));
@@ -202,15 +203,23 @@ export function LiveKitViewer({ streamId, posterUrl }: { streamId: number; poste
     setStatus("connecting");
     try {
       const { token, url } = await fetchToken(streamId, "viewer");
-      const room = new Room({ adaptiveStream: true });
+      // adaptiveStream off: these tiles are always on-screen; we never want the
+      // opponent/host feed paused just because the element is small.
+      const room = new Room({ adaptiveStream: false });
       roomRef.current = room;
       room.on(RoomEvent.TrackSubscribed, (track, _pub, participant) => attachIfHost(track, participant));
       room.on(RoomEvent.ParticipantConnected, (p) => {
-        // refresh waiting state when host joins
-        if (p.identity.startsWith("host-")) setStatus("connecting");
+        // host (re)joined — leave "waiting"; video will flip us to "live"
+        if (p.identity.startsWith("host-")) setStatus((s) => (s === "live" ? s : "connecting"));
+      });
+      room.on(RoomEvent.ParticipantDisconnected, (p) => {
+        // host left — only show waiting if no other host remains (avoids reconnect flicker)
+        if (!p.identity.startsWith("host-")) return;
+        const stillHost = Array.from(room.remoteParticipants.values()).some((rp) => rp.identity.startsWith("host-"));
+        if (!stillHost) setStatus("waiting");
       });
       await room.connect(url, token);
-      // Find an existing remote publisher (host)
+      // Attach any tracks an existing host already published
       const publishers = Array.from(room.remoteParticipants.values()).filter(
         (p) => p.identity.startsWith("host-"),
       );
@@ -222,9 +231,9 @@ export function LiveKitViewer({ streamId, posterUrl }: { streamId: number; poste
             if (pub.track) attachIfHost(pub.track, p);
           }
         }
-        setStatus("live");
+        // host present but no video frame yet — stay "connecting" until it attaches
       }
-      // Flip to live when first video frame attaches
+      // Backstop: flip to live when the first video frame loads
       const vid = videoRef.current;
       if (vid) {
         vid.onloadeddata = () => setStatus("live");

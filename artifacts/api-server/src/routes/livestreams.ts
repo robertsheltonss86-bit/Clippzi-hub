@@ -184,9 +184,11 @@ router.patch("/livestreams/:id", requireAuth, async (req, res) => {
 });
 
 // POST /livestreams/:id/battle - start battle
-router.post("/livestreams/:id/battle", async (req, res) => {
+router.post("/livestreams/:id/battle", requireAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
+    const appUserId = req.user!.appUserId;
+    if (!appUserId) return res.status(401).json({ error: "Unauthorized" });
     const { opponentStreamId, durationSeconds } = req.body as { opponentStreamId: number; durationSeconds: number };
     if (!Number.isFinite(id) || !Number.isFinite(opponentStreamId)) return res.status(400).json({ error: "Invalid id" });
     if (id === opponentStreamId) return res.status(400).json({ error: "Cannot battle yourself" });
@@ -197,6 +199,7 @@ router.post("/livestreams/:id/battle", async (req, res) => {
       const [me] = await tx.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
       const [opp] = await tx.select().from(livestreamsTable).where(eq(livestreamsTable.id, opponentStreamId));
       if (!me || !opp) return { error: "Stream not found", status: 404 as const };
+      if (me.userId !== appUserId) return { error: "Only the host can start a battle", status: 403 as const };
       if (me.status !== "live" || opp.status !== "live") return { error: "Both streams must be live", status: 400 as const };
       if (me.battleOpponentId || opp.battleOpponentId) return { error: "One of the streams is already in a battle", status: 409 as const };
       const [updatedMe] = await tx.update(livestreamsTable).set({
@@ -221,11 +224,14 @@ router.post("/livestreams/:id/battle", async (req, res) => {
 });
 
 // DELETE /livestreams/:id/battle - end battle
-router.delete("/livestreams/:id/battle", async (req, res) => {
+router.delete("/livestreams/:id/battle", requireAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
+    const appUserId = req.user!.appUserId;
+    if (!appUserId) return res.status(401).json({ error: "Unauthorized" });
     const [current] = await db.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
     if (!current) return res.status(404).json({ error: "Stream not found" });
+    if (current.userId !== appUserId) return res.status(403).json({ error: "Only the host can end the battle" });
     const opp = current.battleOpponentId;
     const [stream] = await db.update(livestreamsTable).set({
       battleOpponentId: null,
@@ -243,10 +249,12 @@ router.delete("/livestreams/:id/battle", async (req, res) => {
   }
 });
 
-// POST /livestreams/:id/battle/score - add to score
-router.post("/livestreams/:id/battle/score", async (req, res) => {
+// POST /livestreams/:id/battle/score - add to score (host-only; gifts score server-side via checkout)
+router.post("/livestreams/:id/battle/score", requireAuth, async (req, res) => {
   try {
     const id = Number(req.params.id);
+    const appUserId = req.user!.appUserId;
+    if (!appUserId) return res.status(401).json({ error: "Unauthorized" });
     const { points } = req.body as { points: number };
     const pts = Number(points);
     if (!Number.isFinite(id) || !Number.isFinite(pts)) return res.status(400).json({ error: "Invalid" });
@@ -258,6 +266,7 @@ router.post("/livestreams/:id/battle/score", async (req, res) => {
     const result = await db.transaction(async (tx) => {
       const [current] = await tx.select().from(livestreamsTable).where(eq(livestreamsTable.id, id));
       if (!current) return { error: "Stream not found", status: 404 as const };
+      if (current.userId !== appUserId) return { error: "Only the host can adjust the score", status: 403 as const };
       if (!current.battleOpponentId || !current.battleEndsAt) return { error: "No active battle", status: 409 as const };
       if (new Date(current.battleEndsAt).getTime() <= Date.now()) return { error: "Battle has expired", status: 409 as const };
       const [stream] = await tx.update(livestreamsTable).set({
