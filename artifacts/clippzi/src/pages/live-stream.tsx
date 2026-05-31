@@ -503,8 +503,13 @@ export default function LiveStream() {
           <div />
         </div>
 
-        {/* TIKTOK-STYLE RIGHT RAIL — vertical action stack, above chat overlay */}
-        <div className="pointer-events-auto absolute right-2 z-40 flex flex-col items-center gap-3" style={{ bottom: "42%" }}>
+        {/* TIKTOK-STYLE RIGHT RAIL — vertical action stack, above chat overlay.
+            Bounded between the top header and the chat so a host's taller button
+            stack can never run off the top of the screen (it scrolls instead). */}
+        <div
+          className="pointer-events-auto absolute right-2 z-40 flex flex-col items-center gap-2.5 overflow-y-auto scrollbar-none [&>*]:shrink-0"
+          style={{ top: "calc(env(safe-area-inset-top) + 52px)", bottom: "40%", scrollbarWidth: "none" }}
+        >
           <button onClick={handleShare} className="flex flex-col items-center gap-0.5 group" data-testid="button-share-stream" title="Share">
             <div className="w-11 h-11 rounded-full bg-black/60 backdrop-blur border border-white/10 flex items-center justify-center group-active:scale-95 transition-transform">
               <Share2 className="w-5 h-5 text-white" />

@@ -27,3 +27,7 @@ description: How the two-host "battle" mode renders video and stores scores — 
 - **Why:** the UI must show whole "points", never dollars/pennies. The single conversion helper is `artifacts/clippzi/src/lib/points.ts` `formatPoints(dollars) = round(dollars*100)`.
 - **How to apply:** every writer to `battleScore`/`battleOpponentScore` must use DOLLARS. Gift confirm adds the gift's dollar `total`. The `/battle/score` endpoint takes integer `points` and must divide by 100 before incrementing. Mixing raw points into these dollar fields inflates scores 100x.
 - Gifts are real Stripe payments; the points label is purely presentational (Stripe checkout still shows USD).
+
+## Live-stream right action rail (mobile overflow)
+- The TikTok-style right rail on the live-stream page is absolutely positioned and grows UPWARD from a bottom anchor. A host sees more buttons than a viewer (Share, Who's Live, Cohost, Battle/End, Filter), so a bottom-only anchor pushed the TOP buttons (Share, Who's Live) off-screen behind the header/notch — they looked "missing".
+- Fix: bound the rail with BOTH a top (safe-area + header offset) and bottom (above the 38% chat overlay), keep the most-used buttons first/top, and make it overflow-y-auto with non-shrinking children. Adding more rail buttons later must respect this bounded+scroll container, not a fixed bottom anchor.
