@@ -400,9 +400,9 @@ export default function LiveStream() {
             {/* OWN side — same React position whether or not a battle is active */}
             <div className="relative h-full w-full bg-zinc-900 overflow-hidden">
               {isOwnStream ? (
-                <LiveKitBroadcaster key="self-broadcast" streamId={streamId} filterCss={filterCss} />
+                <LiveKitBroadcaster key="self-broadcast" streamId={streamId} filterCss={filterCss} fit={battleActive ? "contain" : "cover"} />
               ) : (
-                <LiveKitViewer key="self-view" streamId={streamId} posterUrl={stream?.thumbnailUrl ?? undefined} />
+                <LiveKitViewer key="self-view" streamId={streamId} posterUrl={stream?.thumbnailUrl ?? undefined} fit={battleActive ? "contain" : "cover"} />
               )}
               {battleActive && (
                 <div className="absolute bottom-3 left-3 z-20 flex items-center gap-2 bg-black/70 rounded-full px-3 py-1.5 pointer-events-none">
@@ -419,6 +419,7 @@ export default function LiveStream() {
                     key={`opp-${stream.battleOpponentId}`}
                     streamId={stream.battleOpponentId}
                     posterUrl={opponent?.thumbnailUrl ?? undefined}
+                    fit="contain"
                   />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center text-center text-muted-foreground p-4">
@@ -673,8 +674,8 @@ export default function LiveStream() {
           </div>
         )}
 
-        {/* TIKTOK-STYLE MOBILE CHAT OVERLAY — bottom 3/8 of video */}
-        <div className="lg:hidden absolute inset-x-0 bottom-0 h-[38%] z-30 flex flex-col pointer-events-none">
+        {/* TIKTOK-STYLE MOBILE CHAT OVERLAY — kept low on the screen so comments don't crowd the video */}
+        <div className="lg:hidden absolute inset-x-0 bottom-0 h-[26%] z-30 flex flex-col pointer-events-none">
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none" />
           <div ref={mobileChatRef} className="relative flex-1 overflow-y-auto px-2 pt-2 space-y-1.5 pointer-events-auto scrollbar-none" data-testid="mobile-chat-list" style={{ scrollbarWidth: "none" }}>
             {(!chatMessages || chatMessages.length === 0) ? (

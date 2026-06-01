@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetClose, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { Users, Check, X, UserPlus, Loader2 } from "lucide-react";
@@ -145,8 +145,23 @@ export function CohostPanel({ streamId, isHost, onChanged }: { streamId: number;
           )}
         </button>
       </SheetTrigger>
-      <SheetContent side="right" className="bg-card border-border w-full sm:max-w-md flex flex-col">
-        <SheetHeader>
+      <SheetContent
+        side="right"
+        className="bg-card border-border w-full sm:max-w-md flex flex-col [&>button.right-4]:hidden"
+        style={{ paddingTop: "max(1.5rem, calc(env(safe-area-inset-top) + 1rem))" }}
+      >
+        {/* Big, easy-to-tap close that sits clear of the iPhone status bar/battery */}
+        <SheetClose asChild>
+          <button
+            aria-label="Close"
+            data-testid="button-close-cohost"
+            className="absolute right-3 z-50 h-11 w-11 rounded-full bg-black/70 border border-white/20 flex items-center justify-center text-white hover:bg-black/90 active:scale-95 transition"
+            style={{ top: "max(1.25rem, calc(env(safe-area-inset-top) + 0.75rem))" }}
+          >
+            <X className="h-6 w-6" />
+          </button>
+        </SheetClose>
+        <SheetHeader className="pr-12">
           <SheetTitle className="text-white flex items-center gap-2"><Users className="w-5 h-5 text-primary" /> Group Live</SheetTitle>
         </SheetHeader>
 

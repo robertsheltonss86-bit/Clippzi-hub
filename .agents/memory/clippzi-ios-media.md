@@ -29,3 +29,30 @@ before reconnecting; reset publish state (`published`/prompt/error and
 switches re-evaluate instead of trusting stale `published=true`. Prefer LiveKit
 state as source of truth (check `getTrackPublication(Track.Source.Camera)`)
 before publishing again.
+
+# Mid-stream auto-rejoin must distinguish intentional vs unexpected disconnect
+
+A `RoomEvent.Disconnected` handler that blindly rejoins causes reconnect storms
+and rejoins rooms the user deliberately left. Gate every rejoin with: (1) an
+intent ref set on user-stop/unmount (`manualStopRef` for publisher,
+`leftRef` for viewer) — skip rejoin when true; (2) a `roomRef.current === room`
+identity check so a handler from a superseded connect attempt can't fire.
+Reset the intent ref to false at the *start* of each connect cycle.
+
+**Why:** mid-battle network blips were dropping both sides while the DB still
+showed "in battle"; LiveKit's internal retries give up and emit `Disconnected`,
+so we need an app-level rejoin — but only for *unexpected* drops.
+
+# Battle/cohost split-screen video: use object-contain, not object-cover
+
+Tiles in a narrow `grid-cols-2` battle column with `object-cover` crop faces
+badly ("zoomed in"). Add a `fit` prop to broadcaster/viewer and pass
+`fit="contain"` during battles; keep `cover` for full-screen solo.
+
+# Hiding the default Radix Sheet close (iOS notch)
+
+The shadcn `SheetContent` renders a built-in close `<button class="absolute
+right-4 top-4 ...">` that is tiny and sits under the iPhone status bar on a
+full-height right Sheet. Hide ONLY it with `[&>button.right-4]:hidden` (do not
+use `[&>button]:hidden` — it also hides your custom `SheetClose`), then render a
+larger custom `SheetClose` offset by `env(safe-area-inset-top)`.
