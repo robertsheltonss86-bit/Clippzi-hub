@@ -213,12 +213,14 @@ export function LiveKitBroadcaster({ streamId, filterCss, fit = "cover" }: { str
         </div>
       )}
       {status === "live" && (
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-30">
-          <Button onClick={toggleCam} size="icon" variant="secondary" className="rounded-full bg-black/70 backdrop-blur border border-white/20 h-10 w-10" data-testid="button-toggle-cam">
-            {camOn ? <Camera className="w-4 h-4 text-white" /> : <CameraOff className="w-4 h-4 text-secondary" />}
+        // Sit above the mobile chat overlay (bottom 26%) so the camera/mic
+        // toggles are visible and tappable on phones; bottom-anchored on desktop.
+        <div className="absolute bottom-[28%] lg:bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-40">
+          <Button onClick={toggleCam} size="icon" variant="secondary" className="rounded-full bg-black/70 backdrop-blur border border-white/20 h-12 w-12" data-testid="button-toggle-cam">
+            {camOn ? <Camera className="w-5 h-5 text-white" /> : <CameraOff className="w-5 h-5 text-secondary" />}
           </Button>
-          <Button onClick={toggleMic} size="icon" variant="secondary" className="rounded-full bg-black/70 backdrop-blur border border-white/20 h-10 w-10" data-testid="button-toggle-mic">
-            {micOn ? <Mic className="w-4 h-4 text-white" /> : <MicOff className="w-4 h-4 text-secondary" />}
+          <Button onClick={toggleMic} size="icon" variant="secondary" className="rounded-full bg-black/70 backdrop-blur border border-white/20 h-12 w-12" data-testid="button-toggle-mic">
+            {micOn ? <Mic className="w-5 h-5 text-white" /> : <MicOff className="w-5 h-5 text-secondary" />}
           </Button>
           <Button onClick={stop} size="sm" variant="destructive" className="rounded-full h-10" data-testid="button-end-broadcast">
             End stream
