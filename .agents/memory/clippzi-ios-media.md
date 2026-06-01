@@ -43,6 +43,20 @@ Reset the intent ref to false at the *start* of each connect cycle.
 showed "in battle"; LiveKit's internal retries give up and emit `Disconnected`,
 so we need an app-level rejoin — but only for *unexpected* drops.
 
+# Group/cohost: local tile needs localTrack* events to show your own camera
+
+In the multi-tile group room, a per-participant tile that attaches video on
+mount + remote events (`trackSubscribed`/`trackPublished`) will show remote
+people but NOT yourself. The local participant publishes its camera *after*
+mount (esp. after the iOS tap-to-go-on-camera), and the LOCAL participant emits
+`localTrackPublished`/`localTrackUnpublished`, NOT the remote `track*` events.
+Listen for those (plus `trackMuted`/`trackUnmuted`) on the tile and re-run the
+attach, or your own tile stays on the avatar placeholder forever.
+
+**Why:** reported as "in cohost I can see others but not myself"; remote tiles
+worked, proving attach logic was fine — only the local re-attach trigger was
+missing.
+
 # Battle/cohost split-screen video: use object-contain, not object-cover
 
 Tiles in a narrow `grid-cols-2` battle column with `object-cover` crop faces

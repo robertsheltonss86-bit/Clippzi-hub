@@ -233,16 +233,28 @@ function ParticipantTile({ participant, isLocal, filterCss }: { participant: Par
     };
     attachAll();
     const handler = () => attachAll();
+    // Remote participants emit track{Subscribed,Published}; the LOCAL participant
+    // emits localTrack{Published,Unpublished} instead. Without the local events,
+    // your own tile never attaches your camera once you publish (esp. after the
+    // iOS "tap to go on camera"), so you can't see yourself even though others can.
     participant.on("trackSubscribed", handler);
     participant.on("trackPublished", handler);
     participant.on("trackUnsubscribed", handler);
     participant.on("trackUnpublished", handler);
+    participant.on("localTrackPublished", handler);
+    participant.on("localTrackUnpublished", handler);
+    participant.on("trackMuted", handler);
+    participant.on("trackUnmuted", handler);
     return () => {
       detached = true;
       participant.off("trackSubscribed", handler);
       participant.off("trackPublished", handler);
       participant.off("trackUnsubscribed", handler);
       participant.off("trackUnpublished", handler);
+      participant.off("localTrackPublished", handler);
+      participant.off("localTrackUnpublished", handler);
+      participant.off("trackMuted", handler);
+      participant.off("trackUnmuted", handler);
     };
   }, [participant, isLocal]);
 
