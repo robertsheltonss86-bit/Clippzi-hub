@@ -30,18 +30,24 @@ switches re-evaluate instead of trusting stale `published=true`. Prefer LiveKit
 state as source of truth (check `getTrackPublication(Track.Source.Camera)`)
 before publishing again.
 
-# Mid-stream auto-rejoin must distinguish intentional vs unexpected disconnect
+# Do NOT add an app-level RoomEvent.Disconnected -> rejoin loop
 
-A `RoomEvent.Disconnected` handler that blindly rejoins causes reconnect storms
-and rejoins rooms the user deliberately left. Gate every rejoin with: (1) an
-intent ref set on user-stop/unmount (`manualStopRef` for publisher,
-`leftRef` for viewer) — skip rejoin when true; (2) a `roomRef.current === room`
-identity check so a handler from a superseded connect attempt can't fire.
-Reset the intent ref to false at the *start* of each connect cycle.
+Rely on LiveKit's built-in reconnection for transient drops. An app-level
+`RoomEvent.Disconnected` handler that calls `start()`/`join()` again caused a
+production reconnect storm in battle: a single drop rejoined with the SAME
+stable host identity (`host-{id}-{me}` minted server-side), which kicked the
+prior same-identity connection, firing `Disconnected` again — an endless
+ping-pong. Symptom was "I can only see myself, can't see/connect to others" in
+BOTH battle and cohost, because the broadcaster/local tile attaches the local
+camera straight to its own `<video>` so self-preview shows even when
+publish/subscribe never stabilizes. Server logs showed bursts of repeated
+`POST /livekit-token` for the same stream.
 
-**Why:** mid-battle network blips were dropping both sides while the DB still
-showed "in battle"; LiveKit's internal retries give up and emit `Disconnected`,
-so we need an app-level rejoin — but only for *unexpected* drops.
+**Why:** the stable, role-encoded host/cohost identity makes any overlapping
+same-identity connect self-kick; a manual rejoin amplifies one drop into a
+storm. If "battle kicked both out, DB still in battle" recurs, fix it via
+server-side battle/heartbeat cleanup or a (rand)-suffixed publisher identity —
+NOT a client Disconnected->rejoin handler.
 
 # Group/cohost: local tile needs localTrack* events to show your own camera
 

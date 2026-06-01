@@ -34,7 +34,6 @@ export function LiveKitBroadcaster({ streamId, filterCss, fit = "cover" }: { str
   const videoRef = useRef<HTMLVideoElement>(null);
   const roomRef = useRef<Room | null>(null);
   const startingRef = useRef(false); // serialize auto-attempt + tap/retry so we never double-connect
-  const manualStopRef = useRef(false); // true only when the user intentionally ends — suppresses auto-rejoin
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string>("");
   const [camOn, setCamOn] = useState(true);
@@ -58,7 +57,6 @@ export function LiveKitBroadcaster({ streamId, filterCss, fit = "cover" }: { str
     }
     if (startingRef.current) return; // serialize auto-attempt + tap/retry
     startingRef.current = true;
-    manualStopRef.current = false;
     // Drop any half-open room from a previous attempt so we never double-publish.
     await roomRef.current?.disconnect().catch(() => {});
     roomRef.current = null;
@@ -67,14 +65,10 @@ export function LiveKitBroadcaster({ streamId, filterCss, fit = "cover" }: { str
       const { token, url } = await fetchToken(streamId, "publisher");
       const room = new Room({ adaptiveStream: true, dynacast: true });
       roomRef.current = room;
-      // Auto-rejoin if the connection drops unexpectedly (e.g. mid-battle network
-      // blip). LiveKit retries internally first; this fires only after it gives up.
-      room.on(RoomEvent.Disconnected, () => {
-        if (manualStopRef.current) return;
-        if (roomRef.current !== room) return; // superseded by a newer attempt
-        setStatus("connecting");
-        start(false);
-      });
+      // Rely on LiveKit's built-in reconnection for transient drops. A manual
+      // RoomEvent.Disconnected -> start() rejoin caused reconnect storms with the
+      // stable host identity: each rejoin kicked the prior same-identity
+      // connection, which fired Disconnected again -> publish never stabilized.
       await room.connect(url, token);
       const tracks = await createLocalTracks({
         audio: true,
@@ -114,7 +108,6 @@ export function LiveKitBroadcaster({ streamId, filterCss, fit = "cover" }: { str
   };
 
   const stop = async () => {
-    manualStopRef.current = true; // user-initiated — don't auto-rejoin
     await roomRef.current?.disconnect();
     roomRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
@@ -130,7 +123,6 @@ export function LiveKitBroadcaster({ streamId, filterCss, fit = "cover" }: { str
     })();
     return () => {
       cancelled = true;
-      manualStopRef.current = true; // tearing down — don't auto-rejoin
       roomRef.current?.disconnect();
       roomRef.current = null;
     };
@@ -238,7 +230,6 @@ export function LiveKitViewer({ streamId, posterUrl, fit = "cover" }: { streamId
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const roomRef = useRef<Room | null>(null);
-  const leftRef = useRef(false); // true on unmount — suppresses auto-rejoin
   const [status, setStatus] = useState<Status>("connecting");
   const [error, setError] = useState<string>("");
   const [needsUnmute, setNeedsUnmute] = useState(false);
@@ -257,20 +248,14 @@ export function LiveKitViewer({ streamId, posterUrl, fit = "cover" }: { streamId
   const join = async () => {
     setError("");
     setStatus("connecting");
-    leftRef.current = false;
     try {
       const { token, url } = await fetchToken(streamId, "viewer");
       // adaptiveStream off: these tiles are always on-screen; we never want the
       // opponent/host feed paused just because the element is small.
       const room = new Room({ adaptiveStream: false });
       roomRef.current = room;
-      // Auto-rejoin if our connection drops (e.g. mid-battle blip). LiveKit
-      // retries internally first; this fires only after it gives up.
-      room.on(RoomEvent.Disconnected, () => {
-        if (leftRef.current) return;
-        if (roomRef.current !== room) return; // superseded by a newer attempt
-        join();
-      });
+      // Rely on LiveKit's built-in reconnection for transient drops (a manual
+      // rejoin here amplified reconnect churn during battles).
       room.on(RoomEvent.TrackSubscribed, (track, _pub, participant) => attachIfHost(track, participant));
       room.on(RoomEvent.ParticipantConnected, (p) => {
         // host (re)joined — leave "waiting"; video will flip us to "live"
@@ -317,7 +302,6 @@ export function LiveKitViewer({ streamId, posterUrl, fit = "cover" }: { streamId
     })();
     return () => {
       cancelled = true;
-      leftRef.current = true; // tearing down — don't auto-rejoin
       const v = videoRef.current;
       if (v) v.onloadeddata = null;
       roomRef.current?.disconnect();
