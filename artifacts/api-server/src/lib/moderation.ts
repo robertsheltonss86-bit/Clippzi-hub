@@ -27,19 +27,25 @@ const HARD_BLOCK_WORDS = [
   "i will find you",
   "i'll find you",
   "child porn",
-  "cp",
 ];
 const DRUG_WORDS = ["cocaine", "meth", "heroin", "fentanyl", "mdma", "ecstasy", "lsd"];
+
+// Whole-word/phrase match so short tokens (e.g. "kys") don't false-match inside
+// ordinary words. Substring matching here caused benign content to be blocked.
+function containsWord(lower: string, w: string): boolean {
+  const escaped = w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i").test(lower);
+}
 
 function keywordPrefilter(text: string): ModerationResult | null {
   const lower = text.toLowerCase();
   for (const w of HARD_BLOCK_WORDS) {
-    if (lower.includes(w)) {
+    if (containsWord(lower, w)) {
       return { decision: "block", score: 1, flags: ["self_harm_or_threat"], reason: "keyword:" + w };
     }
   }
   let drugHits = 0;
-  for (const w of DRUG_WORDS) if (lower.includes(w)) drugHits++;
+  for (const w of DRUG_WORDS) if (containsWord(lower, w)) drugHits++;
   if (drugHits >= 2) {
     return { decision: "block", score: 0.95, flags: ["drugs"], reason: "keyword:drugs" };
   }
