@@ -6,14 +6,33 @@ import {
   RemoteParticipant,
   Participant,
   createLocalTracks,
+  VideoPresets,
   DataPacket_Kind,
   type LocalTrackPublication,
   type TrackPublication,
+  type RoomOptions,
 } from "livekit-client";
 import { Camera, CameraOff, Mic, MicOff, AlertCircle, Loader2, MicIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type RoleResp = { token: string; url: string; isHost: boolean; isCohost: boolean };
+
+// 720p publish profile for group/cohost. Each cohost is one tile in a grid, so
+// 720p (up from 360p) is sharp on phones without overwhelming bandwidth when
+// several people stream at once. Simulcast sends lower layers too, and
+// adaptiveStream lets small tiles request a smaller layer automatically.
+const GROUP_ROOM_OPTIONS: RoomOptions = {
+  adaptiveStream: true,
+  dynacast: true,
+  videoCaptureDefaults: { resolution: VideoPresets.h720.resolution },
+  publishDefaults: {
+    simulcast: true,
+    videoSimulcastLayers: [VideoPresets.h180, VideoPresets.h360],
+    videoEncoding: VideoPresets.h720.encoding,
+    red: true,
+    dtx: true,
+  },
+};
 
 async function fetchToken(streamId: number, role: "publisher" | "viewer"): Promise<RoleResp> {
   const base = import.meta.env.BASE_URL;
@@ -68,7 +87,7 @@ export function GroupRoomProvider({ streamId, children }: { streamId: number; ch
 
   useEffect(() => {
     let cancelled = false;
-    const r = new Room({ adaptiveStream: true, dynacast: true });
+    const r = new Room(GROUP_ROOM_OPTIONS);
     setStatus("connecting");
     // Fresh connect cycle: clear any stale publish state so we always re-evaluate.
     setPublished(false);
@@ -172,7 +191,9 @@ export function GroupRoomProvider({ streamId, children }: { streamId: number; ch
     try {
       const tracks = await createLocalTracks({
         audio: true,
-        video: { facingMode: "user", resolution: { width: 640, height: 360, frameRate: 24 } },
+        // 720p per tile (up from 360p) — sharp on phones while keeping bandwidth
+        // sane for many simultaneous cohosts; simulcast sends lower layers too.
+        video: { facingMode: "user", resolution: VideoPresets.h720.resolution },
       });
       for (const t of tracks) await r.localParticipant.publishTrack(t);
       setPublished(true);

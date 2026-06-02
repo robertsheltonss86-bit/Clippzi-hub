@@ -76,3 +76,17 @@ right-4 top-4 ...">` that is tiny and sits under the iPhone status bar on a
 full-height right Sheet. Hide ONLY it with `[&>button.right-4]:hidden` (do not
 use `[&>button]:hidden` — it also hides your custom `SheetClose`), then render a
 larger custom `SheetClose` offset by `env(safe-area-inset-top)`.
+
+# Live video quality: simulcast + iOS 720p / others 1080p
+
+Live publish uses LiveKit simulcast (multiple resolutions at once) so the SFU
+gives each viewer the best layer their bandwidth allows. Capture resolution is
+an *ideal* hint, so cameras downscale gracefully (no OverconstrainedError).
+Solo/battle host: 1080p on desktop/Android, 720p on iOS. Group/cohost: 720p per
+tile (was 360p) — lower because many tiles share bandwidth. Audio: red+dtx.
+
+**Why:** iOS Safari (the owner's primary device) can be unstable encoding 1080p
+with multiple simulcast layers and may fail to publish at all; 720p is reliable
+and still HD/TikTok-comparable. Detect iOS via UA + (MacIntel && maxTouchPoints>1
+for iPadOS). **How to apply:** keep the top simulcast layer modest on iOS; never
+force a single high resolution with no graceful path on the host.

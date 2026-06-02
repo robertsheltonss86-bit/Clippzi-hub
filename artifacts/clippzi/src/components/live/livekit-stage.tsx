@@ -7,10 +7,65 @@ import {
   RemoteParticipant,
   LocalParticipant,
   createLocalTracks,
+  VideoPresets,
   type LocalTrackPublication,
+  type RoomOptions,
 } from "livekit-client";
 import { Camera, CameraOff, Mic, MicOff, AlertCircle, Loader2, Radio } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+// Simulcast publishes several resolutions at once so each viewer/server picks
+// the best layer their bandwidth allows — HD for strong connections, a smaller
+// layer instead of a frozen/garbled feed for weak ones. This lifts BOTH picture
+// quality and connection resilience. Capture resolution is an *ideal* hint, so
+// the camera downscales gracefully if it can't hit the target.
+//
+// Full 1080p profile for capable devices (desktop / Android).
+const HD_ROOM_OPTIONS: RoomOptions = {
+  adaptiveStream: true,
+  dynacast: true,
+  videoCaptureDefaults: { resolution: VideoPresets.h1080.resolution },
+  publishDefaults: {
+    simulcast: true,
+    videoSimulcastLayers: [VideoPresets.h360, VideoPresets.h720],
+    videoEncoding: VideoPresets.h1080.encoding,
+    red: true,
+    dtx: true,
+  },
+};
+
+// iOS Safari (the owner's primary device) can be unstable encoding 1080p with
+// multiple simulcast layers, leaving the host unable to publish at all. iPhone/
+// iPad hosts get a rock-solid 720p HD profile (still a big jump, on par with
+// TikTok/IG live) with one fallback layer.
+const IOS_HD_ROOM_OPTIONS: RoomOptions = {
+  adaptiveStream: true,
+  dynacast: true,
+  videoCaptureDefaults: { resolution: VideoPresets.h720.resolution },
+  publishDefaults: {
+    simulcast: true,
+    videoSimulcastLayers: [VideoPresets.h360],
+    videoEncoding: VideoPresets.h720.encoding,
+    red: true,
+    dtx: true,
+  },
+};
+
+// iPadOS 13+ reports as "MacIntel" but has a touch screen, so check both.
+function isIOS(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
+}
+
+// Host publish profile: reliable 720p on iOS, full 1080p elsewhere.
+function hostProfile(): { options: RoomOptions; captureResolution: typeof VideoPresets.h1080.resolution } {
+  return isIOS()
+    ? { options: IOS_HD_ROOM_OPTIONS, captureResolution: VideoPresets.h720.resolution }
+    : { options: HD_ROOM_OPTIONS, captureResolution: VideoPresets.h1080.resolution };
+}
 
 type Status = "idle" | "connecting" | "live" | "denied" | "no-device" | "insecure" | "error" | "waiting";
 
@@ -63,7 +118,8 @@ export function LiveKitBroadcaster({ streamId, filterCss, fit = "cover" }: { str
     setStatus("connecting");
     try {
       const { token, url } = await fetchToken(streamId, "publisher");
-      const room = new Room({ adaptiveStream: true, dynacast: true });
+      const profile = hostProfile();
+      const room = new Room(profile.options);
       roomRef.current = room;
       // Rely on LiveKit's built-in reconnection for transient drops. A manual
       // RoomEvent.Disconnected -> start() rejoin caused reconnect storms with the
@@ -72,7 +128,9 @@ export function LiveKitBroadcaster({ streamId, filterCss, fit = "cover" }: { str
       await room.connect(url, token);
       const tracks = await createLocalTracks({
         audio: true,
-        video: { facingMode: "user", resolution: { width: 1280, height: 720, frameRate: 30 } },
+        // HD capture (ideal hint); simulcast sends lower layers too. 1080p on
+        // capable devices, 720p on iOS for reliable Safari publishing.
+        video: { facingMode: "user", resolution: profile.captureResolution },
       });
       for (const t of tracks) {
         await room.localParticipant.publishTrack(t);

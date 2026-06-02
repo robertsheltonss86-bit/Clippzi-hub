@@ -3,4 +3,4 @@
 - [Clippzi live battle](clippzi-live-battle.md) — battle = two separate LiveKit streams shown via Broadcaster/Viewer (not thumbnails); money cols are dollars, UI shows points via formatPoints (x100).
 - [Stripe connector go-live](stripe-connector-go-live.md) — published app throws "Stripe production connection not found" when no prod connector connection exists; gate an env-var key fallback to production only.
 - [Clippzi auth gating](clippzi-auth-gating.md) — hand-written express routes get NO auth automatically; guard every privileged route; never apply client-supplied `role`/admin flags on self-edits.
-- [Clippzi iOS media](clippzi-ios-media.md) — iOS Safari needs a real tap to publish camera/mic; auto-publish from useEffect connects but publishes nothing — use a tap-to-go-live button + race guards.
+- [Clippzi iOS media](clippzi-ios-media.md) — iOS Safari needs a real tap to publish camera/mic; never add a Disconnected->rejoin loop (storms with stable host identity); live uses simulcast, iOS hosts 720p / others 1080p.
