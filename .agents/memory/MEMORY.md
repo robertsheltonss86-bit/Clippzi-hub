@@ -4,3 +4,4 @@
 - [Stripe connector go-live](stripe-connector-go-live.md) — published app throws "Stripe production connection not found" when no prod connector connection exists; gate an env-var key fallback to production only.
 - [Clippzi auth gating](clippzi-auth-gating.md) — hand-written express routes get NO auth automatically; guard every privileged route; never apply client-supplied `role`/admin flags on self-edits.
 - [Clippzi iOS media](clippzi-ios-media.md) — iOS Safari needs a real tap to publish camera/mic; never add a Disconnected->rejoin loop (storms with stable host identity); live uses simulcast, iOS hosts 720p / others 1080p.
+- [Clippzi mobile](clippzi-mobile.md) — Expo app gotchas: SecureStore hangs web (guard token getter on Platform.web); createComment needs postId in body though CommentInput omits it; mobile token-exchange nonce optional.
